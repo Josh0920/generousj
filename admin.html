@@ -73,7 +73,15 @@
         <textarea id="excerpt" style="min-height:90px" placeholder="Short summary for the homepage..."></textarea>
 
         <div style="height:10px"></div>
-
+<div style="height:10px"></div>
+<label>Featured Image</label>
+<input id="imageFile" type="file" accept="image/*" />
+<div class="muted" style="margin-top:6px;">
+  Upload an image, then save the article. (JPG/PNG recommended)
+</div>
+<div style="height:10px"></div>
+<img id="imagePreview" alt="" style="display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;" />
+<input id="imageUrl" type="text" placeholder="Image URL (auto-filled after upload)" readonly />
         <label>Body (plain text or basic HTML)</label>
         <textarea id="body" placeholder="Write your article..."></textarea>
 
@@ -137,6 +145,11 @@
     const saveMsg = document.getElementById("saveMsg");
     const list = document.getElementById("list");
 
+    // (ADDED) Featured image controls
+    const imageFile = document.getElementById("imageFile");
+    const imagePreview = document.getElementById("imagePreview");
+    const imageUrl = document.getElementById("imageUrl");
+
     let currentUser = null;
     let editingId = null;
 
@@ -160,6 +173,44 @@
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
     }
+
+    // (ADDED) Upload image to Supabase Storage if a new file is selected
+    async function uploadFeaturedImageIfNeeded(){
+      const file = imageFile?.files?.[0];
+      if(!file) return imageUrl.value.trim() || null;
+
+      if(!file.type || !file.type.startsWith("image/")){
+        throw new Error("Selected file is not an image.");
+      }
+
+      if(!currentUser?.id){
+        throw new Error("You must be signed in to upload images.");
+      }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `articles/${currentUser.id}/${Date.now()}-${safeName}`;
+
+      const { error: upErr } = await sb.storage
+        .from("article-images")
+        .upload(path, file, { upsert: false, contentType: file.type });
+
+      if(upErr) throw new Error(upErr.message);
+
+      const { data } = sb.storage.from("article-images").getPublicUrl(path);
+      return data.publicUrl;
+    }
+
+    // (ADDED) Immediate preview when choosing a file
+    imageFile.addEventListener("change", () => {
+      const f = imageFile.files?.[0];
+      if(!f){
+        imagePreview.style.display = "none";
+        imagePreview.src = "";
+        return;
+      }
+      imagePreview.src = URL.createObjectURL(f);
+      imagePreview.style.display = "block";
+    });
 
     async function refreshSession(){
       const { data } = await sb.auth.getSession();
@@ -192,6 +243,13 @@
       excerpt.value = "";
       body.value = "";
       status.value = "draft";
+
+      // (ADDED) reset image inputs
+      imageFile.value = "";
+      imageUrl.value = "";
+      imagePreview.style.display = "none";
+      imagePreview.src = "";
+
       setMsg(saveMsg, "New draft ready.");
     }
 
@@ -250,6 +308,18 @@
       excerpt.value = data.excerpt || "";
       body.value = data.body || "";
       status.value = data.status || "draft";
+
+      // (ADDED) load image url + preview
+      imageUrl.value = data.image_url || "";
+      if(data.image_url){
+        imagePreview.src = data.image_url;
+        imagePreview.style.display = "block";
+      }else{
+        imagePreview.style.display = "none";
+        imagePreview.src = "";
+      }
+      imageFile.value = "";
+
       setMsg(saveMsg, "Loaded.");
     }
 
@@ -266,6 +336,18 @@
 
       const isPublishing = status.value === "published";
 
+      // (ADDED) Upload image if selected; otherwise keep existing imageUrl
+      let uploadedUrl = null;
+      try{
+        uploadedUrl = await uploadFeaturedImageIfNeeded();
+      }catch(e){
+        setMsg(saveMsg, "Image upload failed: " + e.message);
+        return;
+      }
+
+      // Store the public URL in the articles table
+      imageUrl.value = uploadedUrl || "";
+
       const payload = {
         title: t,
         slug: s,
@@ -274,7 +356,10 @@
         status: status.value,
         updated_at: new Date().toISOString(),
         author_id: currentUser.id,
-        published_at: isPublishing ? new Date().toISOString() : null
+        published_at: isPublishing ? new Date().toISOString() : null,
+
+        // (ADDED) featured image URL
+        image_url: uploadedUrl
       };
 
       let res;
