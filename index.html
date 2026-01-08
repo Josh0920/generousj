@@ -476,7 +476,7 @@
         .from("articles")
         .select("title, slug, excerpt, image_path, image_alt, published_at, updated_at")
         .eq("status", "published")
-        .order("published_at", { ascending: false })
+        .order("updated_at", { ascending: false })
         .limit(7);
 
       if(error || !data || data.length === 0){
@@ -495,7 +495,12 @@
 
       const formatDate = (d) =>
         new Date(d).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
-
+data.sort((a, b) => {
+  const ad = new Date(a.published_at || a.updated_at).getTime();
+  const bd = new Date(b.published_at || b.updated_at).getTime();
+  return bd - ad;
+});
+      
       /* ===== LEAD STORY (newest) ===== */
 const leadStory = data[0];
 const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
