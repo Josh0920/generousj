@@ -441,34 +441,41 @@
       window.open("article.html?slug=" + encodeURIComponent(s), "_blank");
     }
 
-    loginBtn.onclick = async () => {
-      setMsg(authMsg, "Checking connection…");
-      const ok = await healthCheck();
-      if(!ok){
-        setMsg(authMsg, "Cannot reach Supabase from this browser/network. Disable ad blockers/shields or try a different network.");
-        return;
-      }
+loginBtn.onclick = async () => {
+  setMsg(authMsg, "Signing in…");
 
-      setMsg(authMsg, "Signing in…");
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: email.value.trim(),
+      password: password.value
+    });
 
-      try{
-        const { data, error } = await sb.auth.signInWithPassword({
-          email: email.value.trim(),
-          password: password.value
-        });
+    if(error){
+      setMsg(authMsg, "Sign-in failed: " + error.message);
+      return;
+    }
 
-        if(error){
-          setMsg(authMsg, "Sign-in failed: " + error.message);
-          return;
-        }
+    // ✅ Force UI to flip immediately using the returned session
+    currentUser = data.user || data.session?.user || null;
 
-        // If sign-in succeeds, refreshSession will switch UI
-        setMsg(authMsg, "");
-        await refreshSession();
-      }catch(e){
-        setMsg(authMsg, "Sign-in failed: " + (e?.message || e));
-      }
-    };
+    if(currentUser){
+      who.textContent = "Signed in: " + (currentUser.email || "user");
+      logoutBtn.style.display = "inline-block";
+      authCard.style.display = "none";
+      editorCard.style.display = "block";
+      listCard.style.display = "block";
+      setMsg(authMsg, "");
+      await loadMyArticles();
+      if(editingId === null) startNew();
+      return;
+    }
+
+    // Fallback if something odd happens
+    setMsg(authMsg, "Signed in, but session not found in browser. Likely storage blocked.");
+  }catch(e){
+    setMsg(authMsg, "Sign-in failed: " + (e?.message || e));
+  }
+};
 
     logoutBtn.onclick = async () => { await sb.auth.signOut(); await refreshSession(); };
 
