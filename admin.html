@@ -14,13 +14,16 @@
     textarea{min-height:220px;resize:vertical}
     button{padding:10px 14px;border-radius:10px;border:1px solid #111;background:#111;color:#fff;font-weight:600;cursor:pointer}
     button.secondary{background:#fff;color:#111}
+    button.danger{background:#fff;color:#b00020;border-color:#b00020}
     .muted{color:#555;font-size:13px}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
     .list{display:flex;flex-direction:column;gap:10px}
     .item{padding:10px;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer}
     .item strong{display:block}
-    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
-    .danger{background:#fff;color:#b00020;border-color:#b00020}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
+    .hr{border-top:1px solid #e5e5e5;margin:12px 0}
+    .tiny{font-size:12px;color:#666}
+    img.preview{display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;}
   </style>
 </head>
 <body>
@@ -30,27 +33,35 @@
         <h1 style="margin:0;">Generous J Press — Editor</h1>
         <div class="muted">Sign in to create, edit, and publish articles.</div>
       </div>
-      <div>
+      <div style="display:flex;gap:10px;align-items:center;">
         <span class="pill" id="who">Signed out</span>
         <button class="secondary" id="logoutBtn" style="display:none;">Log out</button>
       </div>
     </div>
 
     <div class="row">
+      <!-- Auth -->
       <div class="card" id="authCard">
         <h2 style="margin-top:0;">Sign In</h2>
-        <div class="muted">Only the authorized editor account can publish.</div>
+        <div class="muted">Uses Supabase email/password auth.</div>
         <div style="height:10px"></div>
+
         <label>Email</label>
         <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
         <div style="height:10px"></div>
+
         <label>Password</label>
         <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
         <div style="height:14px"></div>
+
         <button id="loginBtn">Sign In</button>
         <p class="muted" id="authMsg" style="margin-top:12px;"></p>
+
+        <div class="hr"></div>
+        <div class="tiny" id="netMsg">Connectivity: (not checked yet)</div>
       </div>
 
+      <!-- Editor -->
       <div class="card" id="editorCard" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <h2 style="margin:0;">Write</h2>
@@ -73,15 +84,16 @@
         <textarea id="excerpt" style="min-height:90px" placeholder="Short summary for the homepage..."></textarea>
 
         <div style="height:10px"></div>
-        <div style="height:10px"></div>
+
         <label>Featured Image</label>
         <input id="imageFile" type="file" accept="image/*" />
-        <div class="muted" style="margin-top:6px;">
-          Upload an image, then save the article. (JPG/PNG recommended)
-        </div>
+        <div class="muted" style="margin-top:6px;">Upload an image, then Save. (Requires Supabase Storage bucket + policies)</div>
         <div style="height:10px"></div>
-        <img id="imagePreview" alt="" style="display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;" />
+        <img id="imagePreview" class="preview" alt="" />
+        <div style="height:10px"></div>
         <input id="imageUrl" type="text" placeholder="Image URL (auto-filled after upload)" readonly />
+
+        <div style="height:10px"></div>
 
         <label>Body (plain text or basic HTML)</label>
         <textarea id="body" placeholder="Write your article..."></textarea>
@@ -110,377 +122,373 @@
 
     <div class="card" id="listCard" style="display:none;">
       <h2 style="margin-top:0;">Your Articles</h2>
-      <div class="muted">Click one to edit. Drafts are private; Published articles show on the homepage.</div>
+      <div class="muted">Click one to edit. Drafts should be private; Published articles show on the homepage.</div>
       <div style="height:12px"></div>
       <div class="list" id="list"></div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- <script>
-  // Your Supabase credentials (safe to use on the client)
-  const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-  const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_PUBLIC_KEY_HERE"; // <-- must be your real ANON key
+  <script>
+    // ==== CONFIG (your values) ====
+    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
-  // Minimal auth config tweak (helps avoid URL/session edge cases)
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false
-    }
-  });
-
-  function withTimeout(promise, ms){
-    return Promise.race([
-      promise,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Sign-in request timed out (blocked or not reaching Supabase).")), ms)
-      )
-    ]);
-  }
-
-  const who = document.getElementById("who");
-  const logoutBtn = document.getElementById("logoutBtn");
-  const authCard = document.getElementById("authCard");
-  const editorCard = document.getElementById("editorCard");
-  const listCard = document.getElementById("listCard");
-
-  const email = document.getElementById("email");
-  const password = document.getElementById("password");
-  const loginBtn = document.getElementById("loginBtn");
-  const authMsg = document.getElementById("authMsg");
-
-  const newBtn = document.getElementById("newBtn");
-  const title = document.getElementById("title");
-  const slug = document.getElementById("slug");
-  const excerpt = document.getElementById("excerpt");
-  const body = document.getElementById("body");
-  const status = document.getElementById("status");
-  const saveBtn = document.getElementById("saveBtn");
-  const previewBtn = document.getElementById("previewBtn");
-  const deleteBtn = document.getElementById("deleteBtn");
-  const saveMsg = document.getElementById("saveMsg");
-  const list = document.getElementById("list");
-
-  // Featured image controls
-  const imageFile = document.getElementById("imageFile");
-  const imagePreview = document.getElementById("imagePreview");
-  const imageUrl = document.getElementById("imageUrl");
-
-  let currentUser = null;
-  let editingId = null;
-
-  function slugify(s){
-    return (s || "")
-      .toLowerCase()
-      .trim()
-      .replace(/['"]/g,"")
-      .replace(/[^a-z0-9]+/g,"-")
-      .replace(/^-+|-+$/g,"")
-      .slice(0,80);
-  }
-
-  function setMsg(el, text){ el.textContent = text || ""; }
-
-  function escapeHtml(s){
-    return String(s || "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  // ✅ NEW: quick connectivity test so we KNOW what's happening
-  async function supabaseHealthCheck(){
-    try{
-      const res = await withTimeout(fetch(SUPABASE_URL + "/auth/v1/health", {
-        method: "GET",
-        headers: { "apikey": SUPABASE_ANON_KEY }
-      }), 6000);
-
-      if(!res.ok){
-        const txt = await res.text().catch(()=> "");
-        return { ok:false, msg:`Supabase reachable but health returned ${res.status}. ${txt}` };
+    // Important: keep this simple + robust for static hosting (GitHub Pages)
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false
       }
-      return { ok:true, msg:"Supabase reachable ✅" };
-    }catch(e){
-      return { ok:false, msg:"Cannot reach Supabase (blocked/network): " + (e?.message || e) };
-    }
-  }
+    });
 
-  // Upload image to Supabase Storage if a new file is selected
-  async function uploadFeaturedImageIfNeeded(){
-    const file = imageFile?.files?.[0];
-    if(!file) return imageUrl.value.trim() || null;
+    const who = document.getElementById("who");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const authCard = document.getElementById("authCard");
+    const editorCard = document.getElementById("editorCard");
+    const listCard = document.getElementById("listCard");
 
-    if(!file.type || !file.type.startsWith("image/")){
-      throw new Error("Selected file is not an image.");
-    }
+    const email = document.getElementById("email");
+    const password = document.getElementById("password");
+    const loginBtn = document.getElementById("loginBtn");
+    const authMsg = document.getElementById("authMsg");
+    const netMsg = document.getElementById("netMsg");
 
-    if(!currentUser?.id){
-      throw new Error("You must be signed in to upload images.");
-    }
+    const newBtn = document.getElementById("newBtn");
+    const title = document.getElementById("title");
+    const slug = document.getElementById("slug");
+    const excerpt = document.getElementById("excerpt");
+    const body = document.getElementById("body");
+    const status = document.getElementById("status");
+    const saveBtn = document.getElementById("saveBtn");
+    const previewBtn = document.getElementById("previewBtn");
+    const deleteBtn = document.getElementById("deleteBtn");
+    const saveMsg = document.getElementById("saveMsg");
+    const list = document.getElementById("list");
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `articles/${currentUser.id}/${Date.now()}-${safeName}`;
+    const imageFile = document.getElementById("imageFile");
+    const imagePreview = document.getElementById("imagePreview");
+    const imageUrl = document.getElementById("imageUrl");
 
-    const { error: upErr } = await sb.storage
-      .from("article-images")
-      .upload(path, file, { upsert: false, contentType: file.type });
+    let currentUser = null;
+    let editingId = null;
 
-    if(upErr) throw new Error(upErr.message);
+    function setMsg(el, text){ el.textContent = text || ""; }
 
-    const { data } = sb.storage.from("article-images").getPublicUrl(path);
-    return data.publicUrl;
-  }
-
-  // Immediate preview when choosing a file
-  imageFile.addEventListener("change", () => {
-    const f = imageFile.files?.[0];
-    if(!f){
-      imagePreview.style.display = "none";
-      imagePreview.src = "";
-      return;
-    }
-    imagePreview.src = URL.createObjectURL(f);
-    imagePreview.style.display = "block";
-  });
-
-  async function refreshSession(){
-    const { data } = await sb.auth.getSession();
-    currentUser = data.session?.user || null;
-
-    if(!currentUser){
-      who.textContent = "Signed out";
-      logoutBtn.style.display = "none";
-      authCard.style.display = "block";
-      editorCard.style.display = "none";
-      listCard.style.display = "none";
-      return;
+    function slugify(s){
+      return (s || "")
+        .toLowerCase()
+        .trim()
+        .replace(/['"]/g,"")
+        .replace(/[^a-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"")
+        .slice(0,80);
     }
 
-    who.textContent = "Signed in: " + (currentUser.email || "user");
-    logoutBtn.style.display = "inline-block";
-    authCard.style.display = "none";
-    editorCard.style.display = "block";
-    listCard.style.display = "block";
-
-    await loadMyArticles();
-    if(editingId === null) startNew();
-  }
-
-  function startNew(){
-    editingId = null;
-    deleteBtn.style.display = "none";
-    title.value = "";
-    slug.value = "";
-    excerpt.value = "";
-    body.value = "";
-    status.value = "draft";
-
-    imageFile.value = "";
-    imageUrl.value = "";
-    imagePreview.style.display = "none";
-    imagePreview.src = "";
-
-    setMsg(saveMsg, "New draft ready.");
-  }
-
-  async function loadMyArticles(){
-    list.innerHTML = "Loading…";
-
-    const { data, error } = await sb
-      .from("articles")
-      .select("id,title,slug,status,published_at,updated_at,created_at")
-      .order("updated_at", { ascending:false });
-
-    if(error){
-      list.innerHTML = "";
-      setMsg(saveMsg, "Error loading articles: " + error.message);
-      return;
+    function escapeHtml(s){
+      return String(s || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
     }
 
-    list.innerHTML = "";
-    if(!data || data.length === 0){
-      list.innerHTML = "<div class='muted'>No articles yet.</div>";
-      return;
+    // === Connectivity check (so we can distinguish "code" vs "network/blocked") ===
+    async function healthCheck(){
+      try{
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+
+        const res = await fetch(SUPABASE_URL + "/auth/v1/health", {
+          method: "GET",
+          headers: { apikey: SUPABASE_ANON_KEY },
+          signal: ctrl.signal
+        });
+
+        clearTimeout(t);
+
+        if(res.ok){
+          netMsg.textContent = "Connectivity: Supabase reachable ✅";
+          return true;
+        }else{
+          const txt = await res.text().catch(()=> "");
+          netMsg.textContent = "Connectivity: Supabase reachable but health returned " + res.status + " " + txt;
+          return false;
+        }
+      }catch(e){
+        netMsg.textContent = "Connectivity: FAILED (blocked/offline): " + (e?.message || e);
+        return false;
+      }
     }
 
-    for(const a of data){
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
-        <strong>${escapeHtml(a.title || "(Untitled)")}</strong>
-        <div class="muted">
-          /article.html?slug=${encodeURIComponent(a.slug)} • ${String(a.status).toUpperCase()} • updated ${new Date(a.updated_at).toLocaleString()}
-        </div>
-      `;
-      div.onclick = () => loadOne(a.id);
-      list.appendChild(div);
-    }
-  }
-
-  async function loadOne(id){
-    const { data, error } = await sb
-      .from("articles")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if(error){
-      setMsg(saveMsg, "Error loading: " + error.message);
-      return;
-    }
-
-    editingId = data.id;
-    deleteBtn.style.display = "inline-block";
-    title.value = data.title || "";
-    slug.value = data.slug || "";
-    excerpt.value = data.excerpt || "";
-    body.value = data.body || "";
-    status.value = data.status || "draft";
-
-    imageUrl.value = data.image_url || "";
-    if(data.image_url){
-      imagePreview.src = data.image_url;
+    // === Image preview ===
+    imageFile.addEventListener("change", () => {
+      const f = imageFile.files?.[0];
+      if(!f){
+        imagePreview.style.display = "none";
+        imagePreview.src = "";
+        return;
+      }
+      imagePreview.src = URL.createObjectURL(f);
       imagePreview.style.display = "block";
-    }else{
+    });
+
+    // === Upload to Storage bucket "article-images" (optional; requires bucket + policies) ===
+    async function uploadFeaturedImageIfNeeded(){
+      const file = imageFile?.files?.[0];
+      if(!file) return imageUrl.value.trim() || null;
+
+      if(!file.type || !file.type.startsWith("image/")){
+        throw new Error("Selected file is not an image.");
+      }
+      if(!currentUser?.id){
+        throw new Error("You must be signed in to upload images.");
+      }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `articles/${currentUser.id}/${Date.now()}-${safeName}`;
+
+      const { error: upErr } = await sb.storage
+        .from("article-images")
+        .upload(path, file, { upsert:false, contentType:file.type });
+
+      if(upErr) throw new Error(upErr.message);
+
+      const { data } = sb.storage.from("article-images").getPublicUrl(path);
+      return data.publicUrl;
+    }
+
+    async function refreshSession(){
+      const { data } = await sb.auth.getSession();
+      currentUser = data.session?.user || null;
+
+      if(!currentUser){
+        who.textContent = "Signed out";
+        logoutBtn.style.display = "none";
+        authCard.style.display = "block";
+        editorCard.style.display = "none";
+        listCard.style.display = "none";
+        return;
+      }
+
+      who.textContent = "Signed in: " + (currentUser.email || "user");
+      logoutBtn.style.display = "inline-block";
+      authCard.style.display = "none";
+      editorCard.style.display = "block";
+      listCard.style.display = "block";
+
+      await loadMyArticles();
+      if(editingId === null) startNew();
+    }
+
+    function startNew(){
+      editingId = null;
+      deleteBtn.style.display = "none";
+      title.value = "";
+      slug.value = "";
+      excerpt.value = "";
+      body.value = "";
+      status.value = "draft";
+
+      imageFile.value = "";
+      imageUrl.value = "";
       imagePreview.style.display = "none";
       imagePreview.src = "";
-    }
-    imageFile.value = "";
 
-    setMsg(saveMsg, "Loaded.");
-  }
-
-  async function save(){
-    if(!currentUser){
-      setMsg(saveMsg, "You are signed out.");
-      return;
+      setMsg(saveMsg, "New draft ready.");
     }
 
-    const t = title.value.trim();
-    const s = slug.value.trim() || slugify(t);
-    if(!t){ setMsg(saveMsg, "Title is required."); return; }
-    if(!s){ setMsg(saveMsg, "Slug is required."); return; }
+    async function loadMyArticles(){
+      list.innerHTML = "Loading…";
+      const { data, error } = await sb
+        .from("articles")
+        .select("id,title,slug,status,updated_at,created_at,published_at")
+        .order("updated_at", { ascending:false });
 
-    const isPublishing = status.value === "published";
+      if(error){
+        list.innerHTML = "";
+        setMsg(saveMsg, "Error loading articles: " + error.message);
+        return;
+      }
 
-    let uploadedUrl = null;
-    try{
-      uploadedUrl = await uploadFeaturedImageIfNeeded();
-    }catch(e){
-      setMsg(saveMsg, "Image upload failed: " + e.message);
-      return;
+      list.innerHTML = "";
+      if(!data || data.length === 0){
+        list.innerHTML = "<div class='muted'>No articles yet.</div>";
+        return;
+      }
+
+      for(const a of data){
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <strong>${escapeHtml(a.title || "(Untitled)")}</strong>
+          <div class="muted">
+            /article.html?slug=${encodeURIComponent(a.slug || "")} • ${String(a.status || "").toUpperCase()} • updated ${a.updated_at ? new Date(a.updated_at).toLocaleString() : ""}
+          </div>
+        `;
+        div.onclick = () => loadOne(a.id);
+        list.appendChild(div);
+      }
     }
 
-    imageUrl.value = uploadedUrl || "";
+    async function loadOne(id){
+      const { data, error } = await sb
+        .from("articles")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    const payload = {
-      title: t,
-      slug: s,
-      excerpt: excerpt.value.trim(),
-      body: body.value.trim(),
-      status: status.value,
-      updated_at: new Date().toISOString(),
-      author_id: currentUser.id,
-      published_at: isPublishing ? new Date().toISOString() : null,
-      image_url: uploadedUrl
-    };
+      if(error){
+        setMsg(saveMsg, "Error loading: " + error.message);
+        return;
+      }
 
-    let res;
-    if(editingId === null){
-      res = await sb.from("articles").insert(payload).select("id").single();
-    }else{
-      res = await sb.from("articles").update(payload).eq("id", editingId).select("id").single();
+      editingId = data.id;
+      deleteBtn.style.display = "inline-block";
+      title.value = data.title || "";
+      slug.value = data.slug || "";
+      excerpt.value = data.excerpt || "";
+      body.value = data.body || "";
+      status.value = data.status || "draft";
+
+      imageUrl.value = data.image_url || "";
+      if(data.image_url){
+        imagePreview.src = data.image_url;
+        imagePreview.style.display = "block";
+      }else{
+        imagePreview.style.display = "none";
+        imagePreview.src = "";
+      }
+      imageFile.value = "";
+
+      setMsg(saveMsg, "Loaded.");
     }
 
-    if(res.error){
-      setMsg(saveMsg, "Save error: " + res.error.message);
-      return;
+    async function save(){
+      if(!currentUser){
+        setMsg(saveMsg, "You are signed out.");
+        return;
+      }
+
+      const t = title.value.trim();
+      const s = slug.value.trim() || slugify(t);
+
+      if(!t){ setMsg(saveMsg, "Title is required."); return; }
+      if(!s){ setMsg(saveMsg, "Slug is required."); return; }
+
+      const isPublishing = status.value === "published";
+
+      let uploadedUrl = null;
+      try{
+        uploadedUrl = await uploadFeaturedImageIfNeeded();
+      }catch(e){
+        // If you haven't set up Storage yet, you'll see a clear error here.
+        setMsg(saveMsg, "Image upload failed: " + (e?.message || e));
+        return;
+      }
+
+      imageUrl.value = uploadedUrl || "";
+
+      const payload = {
+        title: t,
+        slug: s,
+        excerpt: excerpt.value.trim(),
+        body: body.value.trim(),
+        status: status.value,
+        updated_at: new Date().toISOString(),
+        author_id: currentUser.id,
+        published_at: isPublishing ? new Date().toISOString() : null,
+        image_url: uploadedUrl
+      };
+
+      let res;
+      if(editingId === null){
+        res = await sb.from("articles").insert(payload).select("id").single();
+      }else{
+        res = await sb.from("articles").update(payload).eq("id", editingId).select("id").single();
+      }
+
+      if(res.error){
+        setMsg(saveMsg, "Save error: " + res.error.message);
+        return;
+      }
+
+      editingId = res.data.id;
+      deleteBtn.style.display = "inline-block";
+      setMsg(saveMsg, "Saved ✅");
+      await loadMyArticles();
     }
 
-    editingId = res.data.id;
-    deleteBtn.style.display = "inline-block";
-    setMsg(saveMsg, "Saved ✅");
-    await loadMyArticles();
-  }
+    async function del(){
+      if(editingId === null) return;
+      if(!confirm("Delete this article? This cannot be undone.")) return;
 
-  async function del(){
-    if(editingId === null) return;
-    if(!confirm("Delete this article? This cannot be undone.")) return;
-
-    const { error } = await sb.from("articles").delete().eq("id", editingId);
-    if(error){
-      setMsg(saveMsg, "Delete error: " + error.message);
-      return;
-    }
-    setMsg(saveMsg, "Deleted.");
-    await loadMyArticles();
-    startNew();
-  }
-
-  function preview(){
-    const s = slug.value.trim() || slugify(title.value.trim());
-    if(!s){ alert("Add a title or slug first."); return; }
-    window.open("article.html?slug=" + encodeURIComponent(s), "_blank");
-  }
-
-  loginBtn.onclick = async () => {
-    setMsg(authMsg, "Checking connection…");
-
-    // ✅ New: show you if Supabase is reachable BEFORE trying sign-in
-    const health = await supabaseHealthCheck();
-    if(!health.ok){
-      setMsg(authMsg, health.msg);
-      return;
+      const { error } = await sb.from("articles").delete().eq("id", editingId);
+      if(error){
+        setMsg(saveMsg, "Delete error: " + error.message);
+        return;
+      }
+      setMsg(saveMsg, "Deleted.");
+      await loadMyArticles();
+      startNew();
     }
 
-    setMsg(authMsg, "Signing in…");
+    function preview(){
+      const s = slug.value.trim() || slugify(title.value.trim());
+      if(!s){ alert("Add a title or slug first."); return; }
+      window.open("article.html?slug=" + encodeURIComponent(s), "_blank");
+    }
 
-    let result;
-    try{
-      result = await withTimeout(
-        sb.auth.signInWithPassword({
+    loginBtn.onclick = async () => {
+      setMsg(authMsg, "Checking connection…");
+      const ok = await healthCheck();
+      if(!ok){
+        setMsg(authMsg, "Cannot reach Supabase from this browser/network. Disable ad blockers/shields or try a different network.");
+        return;
+      }
+
+      setMsg(authMsg, "Signing in…");
+
+      try{
+        const { data, error } = await sb.auth.signInWithPassword({
           email: email.value.trim(),
           password: password.value
-        }),
-        12000
-      );
-    }catch(e){
-      setMsg(authMsg, "Sign-in failed: " + (e?.message || e));
-      return;
-    }
+        });
 
-    const { error } = result;
-    if(error){
-      setMsg(authMsg, "Sign-in failed: " + error.message);
-      return;
-    }
+        if(error){
+          setMsg(authMsg, "Sign-in failed: " + error.message);
+          return;
+        }
 
-    setMsg(authMsg, "");
-    await refreshSession();
-  };
+        // If sign-in succeeds, refreshSession will switch UI
+        setMsg(authMsg, "");
+        await refreshSession();
+      }catch(e){
+        setMsg(authMsg, "Sign-in failed: " + (e?.message || e));
+      }
+    };
 
-  logoutBtn.onclick = async () => { await sb.auth.signOut(); await refreshSession(); };
+    logoutBtn.onclick = async () => { await sb.auth.signOut(); await refreshSession(); };
 
-  newBtn.onclick = startNew;
+    newBtn.onclick = startNew;
 
-  title.addEventListener("input", () => {
-    if(editingId === null){
-      slug.value = slugify(title.value);
-    }
-  });
+    title.addEventListener("input", () => {
+      if(editingId === null){
+        slug.value = slugify(title.value);
+      }
+    });
 
-  saveBtn.onclick = save;
-  deleteBtn.onclick = del;
-  previewBtn.onclick = preview;
+    saveBtn.onclick = save;
+    deleteBtn.onclick = del;
+    previewBtn.onclick = preview;
 
-  sb.auth.onAuthStateChange(() => refreshSession());
-  refreshSession();
-</script>
+    sb.auth.onAuthStateChange(() => refreshSession());
+
+    // Kick off
+    healthCheck();
+    refreshSession();
   </script>
 </body>
 </html>
