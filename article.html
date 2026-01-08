@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Generous J Press — Article</title>
+  <title>The Generous J Press — Article</title>
   <style>
     :root{--max:860px}
     body{font-family:Georgia,"Times New Roman",Times,serif;margin:0;color:#111;background:#fff}
@@ -19,7 +19,7 @@
 <body>
   <div class="wrap">
     <header>
-      <div class="muted"><a href="index.html">← Back to Generous J Press</a></div>
+      <div class="muted"><a href="index.html">← Back to The Generous J Press</a></div>
       <h1 id="title">Loading…</h1>
       <div class="muted" id="meta"></div>
     </header>
@@ -30,7 +30,7 @@
     <div class="body" id="body"></div>
 
     <div class="rule"></div>
-    <div class="muted">© <span id="y"></span> Generous J Press</div>
+    <div class="muted">© <span id="y"></span> The Generous J Press</div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -64,7 +64,7 @@
         return;
       }
 
-      document.title = data.title + " — Generous J Press";
+      document.title = data.title + " — The Generous J Press";
       document.getElementById("title").textContent = data.title;
 
       const dt = data.published_at || data.updated_at;
