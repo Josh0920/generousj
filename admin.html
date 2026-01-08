@@ -3,499 +3,173 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Generous J Press — Editor</title>
+  <title>Admin — Supabase Sign In</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#fff;color:#111}
-    .wrap{max-width:980px;margin:0 auto;padding:20px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media(max-width:900px){.row{grid-template-columns:1fr}}
-    .card{border:1px solid #e5e5e5;border-radius:14px;padding:16px;background:#fafafa}
-    input,textarea,select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;font:inherit;background:#fff}
-    textarea{min-height:220px;resize:vertical}
-    button{padding:10px 14px;border-radius:10px;border:1px solid #111;background:#111;color:#fff;font-weight:600;cursor:pointer}
-    button.secondary{background:#fff;color:#111}
-    button.danger{background:#fff;color:#b00020;border-color:#b00020}
-    .muted{color:#555;font-size:13px}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid #ddd;background:#fff;font-size:12px}
-    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
-    .list{display:flex;flex-direction:column;gap:10px}
-    .item{padding:10px;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer}
-    .item strong{display:block}
-    .hr{border-top:1px solid #e5e5e5;margin:12px 0}
-    .tiny{font-size:12px;color:#666}
-    img.preview{display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0d12;color:#e9eefc}
+    .wrap{max-width:720px;margin:48px auto;padding:0 18px}
+    .card{background:#121727;border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
+    label{display:block;margin:12px 0 6px;color:#aab4d0;font-size:14px}
+    input{width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1422;color:#e9eefc}
+    button{margin-top:14px;padding:12px 14px;border-radius:12px;border:0;background:#7aa2ff;color:#0b0d12;font-weight:700;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row button{flex:1}
+    .status{margin-top:14px;padding:12px;border-radius:12px;background:#0f1422;border:1px solid rgba(255,255,255,.08);color:#aab4d0;white-space:pre-wrap}
+    .ok{color:#9bffd6}
+    .bad{color:#ff6b6b}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .hint{margin-top:10px;font-size:13px;color:#aab4d0}
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <div>
-        <h1 style="margin:0;">Generous J Press — Editor</h1>
-        <div class="muted">Sign in to create, edit, and publish articles.</div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:center;">
-        <span class="pill" id="who">Signed out</span>
-        <button class="secondary" id="logoutBtn" style="display:none;">Log out</button>
-      </div>
-    </div>
+    <h1 style="margin:0 0 14px;">Admin Sign In</h1>
 
-    <div class="row">
-      <!-- Auth -->
-      <div class="card" id="authCard">
-        <h2 style="margin-top:0;">Sign In</h2>
-        <div class="muted">Uses Supabase email/password auth.</div>
-        <div style="height:10px"></div>
-
-        <label>Email</label>
-        <input id="email" type="email" placeholder="you@example.com" autocomplete="email" />
-        <div style="height:10px"></div>
-
-        <label>Password</label>
-        <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
-        <div style="height:14px"></div>
-
-        <button id="loginBtn">Sign In</button>
-        <p class="muted" id="authMsg" style="margin-top:12px;"></p>
-
-        <div class="hr"></div>
-        <div class="tiny" id="netMsg">Connectivity: (not checked yet)</div>
+    <div class="card">
+      <div style="font-size:14px;color:#aab4d0;">
+        If sign-in fails, open DevTools → Console + Network and you’ll see exactly why.
       </div>
 
-      <!-- Editor -->
-      <div class="card" id="editorCard" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-          <h2 style="margin:0;">Write</h2>
-          <button class="secondary" id="newBtn">New</button>
+      <!-- FORM: prevents reload + ensures email/password are read correctly -->
+      <form id="loginForm" autocomplete="on">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" placeholder="you@email.com" required />
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+
+        <div class="row">
+          <button id="btnSignIn" type="submit">Sign in</button>
+          <button id="btnSignOut" type="button">Sign out</button>
         </div>
+      </form>
 
-        <div style="height:10px"></div>
+      <div id="status" class="status">Ready.</div>
 
-        <label>Title</label>
-        <input id="title" placeholder="Headline goes here" />
-
-        <div style="height:10px"></div>
-
-        <label>Slug (URL)</label>
-        <input id="slug" placeholder="e.g., my-first-story" />
-
-        <div style="height:10px"></div>
-
-        <label>Excerpt</label>
-        <textarea id="excerpt" style="min-height:90px" placeholder="Short summary for the homepage..."></textarea>
-
-        <div style="height:10px"></div>
-
-        <label>Featured Image</label>
-        <input id="imageFile" type="file" accept="image/*" />
-        <div class="muted" style="margin-top:6px;">Upload an image, then Save. (Requires Supabase Storage bucket + policies)</div>
-        <div style="height:10px"></div>
-        <img id="imagePreview" class="preview" alt="" />
-        <div style="height:10px"></div>
-        <input id="imageUrl" type="text" placeholder="Image URL (auto-filled after upload)" readonly />
-
-        <div style="height:10px"></div>
-
-        <label>Body (plain text or basic HTML)</label>
-        <textarea id="body" placeholder="Write your article..."></textarea>
-
-        <div style="height:10px"></div>
-
-        <label>Status</label>
-        <select id="status">
-          <option value="draft">Draft</option>
-          <option value="published">Published</option>
-        </select>
-
-        <div style="height:14px"></div>
-
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button id="saveBtn">Save</button>
-          <button class="secondary" id="previewBtn">Preview</button>
-          <button class="danger" id="deleteBtn" style="display:none;">Delete</button>
-        </div>
-
-        <p class="muted" id="saveMsg" style="margin-top:12px;"></p>
+      <div class="hint">
+        Tip: Don’t run this as <code>file://</code>. Use GitHub Pages / Netlify / or local server (http://localhost).
       </div>
-    </div>
-
-    <div style="height:16px"></div>
-
-    <div class="card" id="listCard" style="display:none;">
-      <h2 style="margin-top:0;">Your Articles</h2>
-      <div class="muted">Click one to edit. Drafts should be private; Published articles show on the homepage.</div>
-      <div style="height:12px"></div>
-      <div class="list" id="list"></div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    // ==== CONFIG (your values) ====
+  <script type="module">
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
-    // Important: keep this simple + robust for static hosting (GitHub Pages)
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false
-      }
+    const statusEl = document.getElementById("status");
+    const form     = document.getElementById("loginForm");
+    const emailEl  = document.getElementById("email");
+    const passEl   = document.getElementById("password");
+    const btnIn    = document.getElementById("btnSignIn");
+    const btnOut   = document.getElementById("btnSignOut");
+
+    function log(msg, cls="") {
+      statusEl.className = "status " + cls;
+      statusEl.textContent = msg;
+      console.log("[admin]", msg);
+    }
+
+    // Warn if running via file://
+    if (location.protocol === "file:") {
+      log("Warning: You are running this page via file://\nServe via http:// (GitHub Pages/Netlify/local server) to avoid auth/network issues.", "bad");
+    }
+
+    // Load Supabase (v2)
+    let createClient;
+    try {
+      ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
+      console.log("[admin] Supabase JS loaded.");
+    } catch (e) {
+      log("Failed to load Supabase library:\n" + String(e), "bad");
+      throw e;
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
-    const who = document.getElementById("who");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const authCard = document.getElementById("authCard");
-    const editorCard = document.getElementById("editorCard");
-    const listCard = document.getElementById("listCard");
-
-    const email = document.getElementById("email");
-    const password = document.getElementById("password");
-    const loginBtn = document.getElementById("loginBtn");
-    const authMsg = document.getElementById("authMsg");
-    const netMsg = document.getElementById("netMsg");
-
-    const newBtn = document.getElementById("newBtn");
-    const title = document.getElementById("title");
-    const slug = document.getElementById("slug");
-    const excerpt = document.getElementById("excerpt");
-    const body = document.getElementById("body");
-    const status = document.getElementById("status");
-    const saveBtn = document.getElementById("saveBtn");
-    const previewBtn = document.getElementById("previewBtn");
-    const deleteBtn = document.getElementById("deleteBtn");
-    const saveMsg = document.getElementById("saveMsg");
-    const list = document.getElementById("list");
-
-    const imageFile = document.getElementById("imageFile");
-    const imagePreview = document.getElementById("imagePreview");
-    const imageUrl = document.getElementById("imageUrl");
-
-    let currentUser = null;
-    let editingId = null;
-
-    function setMsg(el, text){ el.textContent = text || ""; }
-
-    function slugify(s){
-      return (s || "")
-        .toLowerCase()
-        .trim()
-        .replace(/['"]/g,"")
-        .replace(/[^a-z0-9]+/g,"-")
-        .replace(/^-+|-+$/g,"")
-        .slice(0,80);
+    // Timeout helper so nothing can spin forever
+    function withTimeout(promise, ms=12000) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timed out after " + ms + "ms (blocked/offline/request stalled)")), ms)
+        )
+      ]);
     }
 
-    function escapeHtml(s){
-      return String(s || "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
+    async function showSession() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return log("getSession error:\n" + error.message, "bad");
+      if (data.session) {
+        log("Signed in ✅\nUser: " + data.session.user.email, "ok");
+      } else {
+        log("No session (signed out).");
+      }
     }
 
-    // === Connectivity check (so we can distinguish "code" vs "network/blocked") ===
-    async function healthCheck(){
-      try{
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 6000);
+    // Listen for auth events
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[admin] Auth event:", event, session);
+      if (event === "SIGNED_IN") log("SIGNED_IN ✅\nUser: " + (session?.user?.email ?? "unknown"), "ok");
+      if (event === "SIGNED_OUT") log("SIGNED_OUT ✅");
+    });
 
-        const res = await fetch(SUPABASE_URL + "/auth/v1/health", {
-          method: "GET",
-          headers: { apikey: SUPABASE_ANON_KEY },
-          signal: ctrl.signal
-        });
+    // Submit sign-in (prevents reload + guarantees email/password captured)
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-        clearTimeout(t);
+      const email = (emailEl.value || "").trim();
+      const password = passEl.value || "";
 
-        if(res.ok){
-          netMsg.textContent = "Connectivity: Supabase reachable ✅";
-          return true;
-        }else{
-          const txt = await res.text().catch(()=> "");
-          netMsg.textContent = "Connectivity: Supabase reachable but health returned " + res.status + " " + txt;
-          return false;
+      // Debug to prove values are captured (fixes “missing email or phone”)
+      console.log("[admin] DEBUG values:", {
+        email: JSON.stringify(email),
+        password_len: password.length
+      });
+
+      if (!email || !password) {
+        log("Enter email + password (they can’t be blank).", "bad");
+        return;
+      }
+
+      btnIn.disabled = true;
+      log("Signing in… (check Console/Network if it fails)", "");
+
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          12000
+        );
+
+        if (error) {
+          log("Sign-in error:\n" + error.message, "bad");
+          return;
         }
-      }catch(e){
-        netMsg.textContent = "Connectivity: FAILED (blocked/offline): " + (e?.message || e);
-        return false;
-      }
-    }
 
-    // === Image preview ===
-    imageFile.addEventListener("change", () => {
-      const f = imageFile.files?.[0];
-      if(!f){
-        imagePreview.style.display = "none";
-        imagePreview.src = "";
-        return;
-      }
-      imagePreview.src = URL.createObjectURL(f);
-      imagePreview.style.display = "block";
-    });
-
-    // === Upload to Storage bucket "article-images" (optional; requires bucket + policies) ===
-    async function uploadFeaturedImageIfNeeded(){
-      const file = imageFile?.files?.[0];
-      if(!file) return imageUrl.value.trim() || null;
-
-      if(!file.type || !file.type.startsWith("image/")){
-        throw new Error("Selected file is not an image.");
-      }
-      if(!currentUser?.id){
-        throw new Error("You must be signed in to upload images.");
-      }
-
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const path = `articles/${currentUser.id}/${Date.now()}-${safeName}`;
-
-      const { error: upErr } = await sb.storage
-        .from("article-images")
-        .upload(path, file, { upsert:false, contentType:file.type });
-
-      if(upErr) throw new Error(upErr.message);
-
-      const { data } = sb.storage.from("article-images").getPublicUrl(path);
-      return data.publicUrl;
-    }
-
-    async function refreshSession(){
-      const { data } = await sb.auth.getSession();
-      currentUser = data.session?.user || null;
-
-      if(!currentUser){
-        who.textContent = "Signed out";
-        logoutBtn.style.display = "none";
-        authCard.style.display = "block";
-        editorCard.style.display = "none";
-        listCard.style.display = "none";
-        return;
-      }
-
-      who.textContent = "Signed in: " + (currentUser.email || "user");
-      logoutBtn.style.display = "inline-block";
-      authCard.style.display = "none";
-      editorCard.style.display = "block";
-      listCard.style.display = "block";
-
-      await loadMyArticles();
-      if(editingId === null) startNew();
-    }
-
-    function startNew(){
-      editingId = null;
-      deleteBtn.style.display = "none";
-      title.value = "";
-      slug.value = "";
-      excerpt.value = "";
-      body.value = "";
-      status.value = "draft";
-
-      imageFile.value = "";
-      imageUrl.value = "";
-      imagePreview.style.display = "none";
-      imagePreview.src = "";
-
-      setMsg(saveMsg, "New draft ready.");
-    }
-
-    async function loadMyArticles(){
-      list.innerHTML = "Loading…";
-      const { data, error } = await sb
-        .from("articles")
-        .select("id,title,slug,status,updated_at,created_at,published_at")
-        .order("updated_at", { ascending:false });
-
-      if(error){
-        list.innerHTML = "";
-        setMsg(saveMsg, "Error loading articles: " + error.message);
-        return;
-      }
-
-      list.innerHTML = "";
-      if(!data || data.length === 0){
-        list.innerHTML = "<div class='muted'>No articles yet.</div>";
-        return;
-      }
-
-      for(const a of data){
-        const div = document.createElement("div");
-        div.className = "item";
-        div.innerHTML = `
-          <strong>${escapeHtml(a.title || "(Untitled)")}</strong>
-          <div class="muted">
-            /article.html?slug=${encodeURIComponent(a.slug || "")} • ${String(a.status || "").toUpperCase()} • updated ${a.updated_at ? new Date(a.updated_at).toLocaleString() : ""}
-          </div>
-        `;
-        div.onclick = () => loadOne(a.id);
-        list.appendChild(div);
-      }
-    }
-
-    async function loadOne(id){
-      const { data, error } = await sb
-        .from("articles")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if(error){
-        setMsg(saveMsg, "Error loading: " + error.message);
-        return;
-      }
-
-      editingId = data.id;
-      deleteBtn.style.display = "inline-block";
-      title.value = data.title || "";
-      slug.value = data.slug || "";
-      excerpt.value = data.excerpt || "";
-      body.value = data.body || "";
-      status.value = data.status || "draft";
-
-      imageUrl.value = data.image_url || "";
-      if(data.image_url){
-        imagePreview.src = data.image_url;
-        imagePreview.style.display = "block";
-      }else{
-        imagePreview.style.display = "none";
-        imagePreview.src = "";
-      }
-      imageFile.value = "";
-
-      setMsg(saveMsg, "Loaded.");
-    }
-
-    async function save(){
-      if(!currentUser){
-        setMsg(saveMsg, "You are signed out.");
-        return;
-      }
-
-      const t = title.value.trim();
-      const s = slug.value.trim() || slugify(t);
-
-      if(!t){ setMsg(saveMsg, "Title is required."); return; }
-      if(!s){ setMsg(saveMsg, "Slug is required."); return; }
-
-      const isPublishing = status.value === "published";
-
-      let uploadedUrl = null;
-      try{
-        uploadedUrl = await uploadFeaturedImageIfNeeded();
-      }catch(e){
-        // If you haven't set up Storage yet, you'll see a clear error here.
-        setMsg(saveMsg, "Image upload failed: " + (e?.message || e));
-        return;
-      }
-
-      imageUrl.value = uploadedUrl || "";
-
-      const payload = {
-        title: t,
-        slug: s,
-        excerpt: excerpt.value.trim(),
-        body: body.value.trim(),
-        status: status.value,
-        updated_at: new Date().toISOString(),
-        author_id: currentUser.id,
-        published_at: isPublishing ? new Date().toISOString() : null,
-        image_url: uploadedUrl
-      };
-
-      let res;
-      if(editingId === null){
-        res = await sb.from("articles").insert(payload).select("id").single();
-      }else{
-        res = await sb.from("articles").update(payload).eq("id", editingId).select("id").single();
-      }
-
-      if(res.error){
-        setMsg(saveMsg, "Save error: " + res.error.message);
-        return;
-      }
-
-      editingId = res.data.id;
-      deleteBtn.style.display = "inline-block";
-      setMsg(saveMsg, "Saved ✅");
-      await loadMyArticles();
-    }
-
-    async function del(){
-      if(editingId === null) return;
-      if(!confirm("Delete this article? This cannot be undone.")) return;
-
-      const { error } = await sb.from("articles").delete().eq("id", editingId);
-      if(error){
-        setMsg(saveMsg, "Delete error: " + error.message);
-        return;
-      }
-      setMsg(saveMsg, "Deleted.");
-      await loadMyArticles();
-      startNew();
-    }
-
-    function preview(){
-      const s = slug.value.trim() || slugify(title.value.trim());
-      if(!s){ alert("Add a title or slug first."); return; }
-      window.open("article.html?slug=" + encodeURIComponent(s), "_blank");
-    }
-
-loginBtn.onclick = async () => {
-  setMsg(authMsg, "Signing in…");
-
-  try{
-    const { data, error } = await sb.auth.signInWithPassword({
-      email: email.value.trim(),
-      password: password.value
-    });
-
-    if(error){
-      setMsg(authMsg, "Sign-in failed: " + error.message);
-      return;
-    }
-
-    // ✅ Force UI to flip immediately using the returned session
-    currentUser = data.user || data.session?.user || null;
-
-    if(currentUser){
-      who.textContent = "Signed in: " + (currentUser.email || "user");
-      logoutBtn.style.display = "inline-block";
-      authCard.style.display = "none";
-      editorCard.style.display = "block";
-      listCard.style.display = "block";
-      setMsg(authMsg, "");
-      await loadMyArticles();
-      if(editingId === null) startNew();
-      return;
-    }
-
-    // Fallback if something odd happens
-    setMsg(authMsg, "Signed in, but session not found in browser. Likely storage blocked.");
-  }catch(e){
-    setMsg(authMsg, "Sign-in failed: " + (e?.message || e));
-  }
-};
-
-    logoutBtn.onclick = async () => { await sb.auth.signOut(); await refreshSession(); };
-
-    newBtn.onclick = startNew;
-
-    title.addEventListener("input", () => {
-      if(editingId === null){
-        slug.value = slugify(title.value);
+        log("Sign-in returned ✅\nUser: " + (data.user?.email ?? "unknown"), "ok");
+        await showSession();
+      } catch (err) {
+        log("Sign-in exception:\n" + (err?.message ?? String(err)), "bad");
+      } finally {
+        btnIn.disabled = false;
       }
     });
 
-    saveBtn.onclick = save;
-    deleteBtn.onclick = del;
-    previewBtn.onclick = preview;
+    // Sign out
+    btnOut.addEventListener("click", async () => {
+      btnOut.disabled = true;
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) return log("Sign-out error:\n" + error.message, "bad");
+        log("Signed out ✅");
+      } finally {
+        btnOut.disabled = false;
+      }
+    });
 
-    sb.auth.onAuthStateChange(() => refreshSession());
-
-    // Kick off
-    healthCheck();
-    refreshSession();
+    // Initial state
+    await showSession();
   </script>
 </body>
 </html>
