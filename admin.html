@@ -411,6 +411,7 @@ const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
       let result;
       try{
+        console.log("Trying sign-in against:", SUPABASE_URL);
         result = await withTimeout(
           sb.auth.signInWithPassword({
             email: email.value.trim(),
