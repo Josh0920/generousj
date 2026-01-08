@@ -474,7 +474,7 @@
 
       const { data, error } = await sb
         .from("articles")
-        .select("title, slug, excerpt, published_at, updated_at")
+        .select("title, slug, excerpt, image_path, image_alt, published_at, updated_at")
         .eq("status", "published")
         .order("published_at", { ascending: false })
         .limit(7);
@@ -497,20 +497,40 @@
         new Date(d).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
 
       /* ===== LEAD STORY (newest) ===== */
-      const leadStory = data[0];
-      const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
+const leadStory = data[0];
+const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
 
-      lead.innerHTML = `
-        <article class="lead">
-          <h1 class="headline">
-            <a href="article.html?slug=${encodeURIComponent(leadStory.slug)}">
-              ${escapeHtml(leadStory.title)}
-            </a>
-          </h1>
-          <div class="byline">${leadDate}</div>
-          <p class="dek">${escapeHtml(leadStory.excerpt || "")}</p>
-        </article>
-      `;
+// ✅ NEW: turn storage path into a real URL
+let leadImgHtml = "";
+if (leadStory.image_path) {
+  const { data: img } = sb.storage.from("article-images").getPublicUrl(leadStory.image_path);
+  const url = img?.publicUrl;
+  if (url) {
+    leadImgHtml = `
+      <div class="media" style="aspect-ratio: 16/9; margin: 6px 0 12px;">
+        <img
+          src="${url}"
+          alt="${escapeHtml(leadStory.image_alt || "")}"
+          style="width:100%;height:100%;object-fit:cover"
+          loading="lazy"
+        />
+      </div>
+    `;
+  }
+}
+
+lead.innerHTML = `
+  <article class="lead">
+    ${leadImgHtml}
+    <h1 class="headline">
+      <a href="article.html?slug=${encodeURIComponent(leadStory.slug)}">
+        ${escapeHtml(leadStory.title)}
+      </a>
+    </h1>
+    <div class="byline">${leadDate}</div>
+    <p class="dek">${escapeHtml(leadStory.excerpt || "")}</p>
+  </article>
+`;
 
       /* ===== TOP STORIES (older) ===== */
       top.innerHTML = "";
