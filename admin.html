@@ -3,58 +3,125 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin — Supabase Sign In</title>
+  <title>Admin Login</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0d12;color:#e9eefc}
-    .wrap{max-width:720px;margin:48px auto;padding:0 18px}
-    .card{background:#121727;border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:18px}
-    label{display:block;margin:12px 0 6px;color:#aab4d0;font-size:14px}
-    input{width:100%;padding:12px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1422;color:#e9eefc}
-    button{margin-top:14px;padding:12px 14px;border-radius:12px;border:0;background:#7aa2ff;color:#0b0d12;font-weight:700;cursor:pointer}
+    :root{
+      --bg:#ffffff;
+      --text:#111111;
+      --muted:#555555;
+      --border:#d9d9d9;
+      --btn:#111111;
+      --btnText:#ffffff;
+      --radius:12px;
+    }
+    html, body { height:100%; }
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .wrap{
+      width:100%;
+      max-width:420px;
+      padding:28px 18px;
+    }
+    h1{
+      margin:0 0 8px;
+      font-size:22px;
+      letter-spacing:-0.01em;
+    }
+    p{
+      margin:0 0 18px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+    }
+    label{
+      display:block;
+      margin:14px 0 6px;
+      font-size:13px;
+      color:var(--text);
+    }
+    input{
+      width:100%;
+      box-sizing:border-box;
+      padding:12px 12px;
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:#fff;
+      color:var(--text);
+      font-size:15px;
+      outline:none;
+    }
+    input:focus{
+      border-color:#999;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+    }
+    button{
+      width:100%;
+      padding:12px 12px;
+      border-radius:var(--radius);
+      border:1px solid var(--btn);
+      background:var(--btn);
+      color:var(--btnText);
+      font-weight:650;
+      font-size:15px;
+      cursor:pointer;
+    }
+    button.secondary{
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--border);
+      font-weight:600;
+    }
     button[disabled]{opacity:.6;cursor:not-allowed}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row button{flex:1}
-    .status{margin-top:14px;padding:12px;border-radius:12px;background:#0f1422;border:1px solid rgba(255,255,255,.08);color:#aab4d0;white-space:pre-wrap}
-    .ok{color:#9bffd6}
-    .bad{color:#ff6b6b}
-    code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-    .hint{margin-top:10px;font-size:13px;color:#aab4d0}
+    .status{
+      margin-top:14px;
+      font-size:13px;
+      color:var(--muted);
+      white-space:pre-wrap;
+      border-top:1px solid #eee;
+      padding-top:12px;
+      min-height:18px;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1 style="margin:0 0 14px;">Admin Sign In</h1>
+    <h1>Admin</h1>
+    <p>Sign in to create or edit articles.</p>
 
-    <div class="card">
-      <div style="font-size:14px;color:#aab4d0;">
-        If sign-in fails, open DevTools → Console + Network and you’ll see exactly why.
+    <form id="loginForm" autocomplete="on">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" placeholder="you@email.com" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Password" required />
+
+      <div class="row">
+        <button id="btnSignIn" type="submit">Sign in</button>
+        <button id="btnSignOut" class="secondary" type="button">Sign out</button>
       </div>
+    </form>
 
-      <!-- FORM: prevents reload + ensures email/password are read correctly -->
-      <form id="loginForm" autocomplete="on">
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" placeholder="you@email.com" required />
-
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
-
-        <div class="row">
-          <button id="btnSignIn" type="submit">Sign in</button>
-          <button id="btnSignOut" type="button">Sign out</button>
-        </div>
-      </form>
-
-      <div id="status" class="status">Ready.</div>
-
-      <div class="hint">
-        Tip: Don’t run this as <code>file://</code>. Use GitHub Pages / Netlify / or local server (http://localhost).
-      </div>
-    </div>
+    <div id="status" class="status">Ready.</div>
   </div>
 
   <script type="module">
+    // === Supabase config (yours) ===
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+
+    // ✅ Redirect target (use absolute to avoid folder path issues)
+    const REDIRECT_TO = "/article.html";
 
     const statusEl = document.getElementById("status");
     const form     = document.getElementById("loginForm");
@@ -63,24 +130,17 @@
     const btnIn    = document.getElementById("btnSignIn");
     const btnOut   = document.getElementById("btnSignOut");
 
-    function log(msg, cls="") {
-      statusEl.className = "status " + cls;
+    function setStatus(msg) {
       statusEl.textContent = msg;
       console.log("[admin]", msg);
     }
 
-    // Warn if running via file://
-    if (location.protocol === "file:") {
-      log("Warning: You are running this page via file://\nServe via http:// (GitHub Pages/Netlify/local server) to avoid auth/network issues.", "bad");
-    }
-
-    // Load Supabase (v2)
+    // Load Supabase JS v2
     let createClient;
     try {
       ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
-      console.log("[admin] Supabase JS loaded.");
     } catch (e) {
-      log("Failed to load Supabase library:\n" + String(e), "bad");
+      setStatus("Failed to load Supabase library.");
       throw e;
     }
 
@@ -88,69 +148,56 @@
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
 
-    // Timeout helper so nothing can spin forever
-    function withTimeout(promise, ms=12000) {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timed out after " + ms + "ms (blocked/offline/request stalled)")), ms)
-        )
-      ]);
+    function redirectNow() {
+      setStatus("Redirecting…");
+      // small delay helps session persist before new page loads
+      setTimeout(() => {
+        window.location.href = REDIRECT_TO;
+      }, 120);
     }
 
-    async function showSession() {
+    // If already signed in, redirect immediately on load
+    async function init() {
       const { data, error } = await supabase.auth.getSession();
-      if (error) return log("getSession error:\n" + error.message, "bad");
+      if (error) {
+        setStatus("Session error: " + error.message);
+        return;
+      }
       if (data.session) {
-        log("Signed in ✅\nUser: " + data.session.user.email, "ok");
+        redirectNow();
       } else {
-        log("No session (signed out).");
+        setStatus("Ready.");
       }
     }
 
-    // Listen for auth events
-    supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[admin] Auth event:", event, session);
-      if (event === "SIGNED_IN") log("SIGNED_IN ✅\nUser: " + (session?.user?.email ?? "unknown"), "ok");
-      if (event === "SIGNED_OUT") log("SIGNED_OUT ✅");
-    });
-
-    // Submit sign-in (prevents reload + guarantees email/password captured)
+    // Login submit
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       const email = (emailEl.value || "").trim();
       const password = passEl.value || "";
 
-      // Debug to prove values are captured (fixes “missing email or phone”)
-      console.log("[admin] DEBUG values:", {
-        email: JSON.stringify(email),
-        password_len: password.length
-      });
-
       if (!email || !password) {
-        log("Enter email + password (they can’t be blank).", "bad");
+        setStatus("Enter email + password.");
         return;
       }
 
       btnIn.disabled = true;
-      log("Signing in… (check Console/Network if it fails)", "");
+      setStatus("Signing in…");
 
       try {
-        const { data, error } = await withTimeout(
-          supabase.auth.signInWithPassword({ email, password }),
-          12000
-        );
-
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
-          log("Sign-in error:\n" + error.message, "bad");
+          setStatus("Sign-in error: " + error.message);
           return;
         }
-
-        log("Sign-in returned ✅\nUser: " + (data.user?.email ?? "unknown"), "ok");
-        await showSession();
+        if (data?.session || data?.user) {
+          redirectNow();
+        } else {
+          setStatus("Signed in, but no session returned.");
+        }
       } catch (err) {
-        log("Sign-in exception:\n" + (err?.message ?? String(err)), "bad");
+        setStatus("Sign-in failed: " + (err?.message ?? String(err)));
       } finally {
         btnIn.disabled = false;
       }
@@ -159,17 +206,17 @@
     // Sign out
     btnOut.addEventListener("click", async () => {
       btnOut.disabled = true;
+      setStatus("Signing out…");
       try {
         const { error } = await supabase.auth.signOut();
-        if (error) return log("Sign-out error:\n" + error.message, "bad");
-        log("Signed out ✅");
+        if (error) setStatus("Sign-out error: " + error.message);
+        else setStatus("Signed out.");
       } finally {
         btnOut.disabled = false;
       }
     });
 
-    // Initial state
-    await showSession();
+    await init();
   </script>
 </body>
 </html>
