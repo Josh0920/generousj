@@ -24,6 +24,9 @@
       <div class="muted" id="meta"></div>
     </header>
 
+    <!-- (ADDED) Featured image placeholder -->
+    <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
+
     <div class="body" id="body"></div>
 
     <div class="rule"></div>
@@ -51,7 +54,7 @@
       // Public policy should allow only published articles
       const { data, error } = await sb
         .from("articles")
-        .select("title,body,excerpt,published_at,updated_at,status,slug")
+        .select("title,body,excerpt,published_at,updated_at,status,slug,image_url")
         .eq("slug", slug)
         .single();
 
@@ -67,6 +70,17 @@
       const dt = data.published_at || data.updated_at;
       document.getElementById("meta").textContent =
         "Published: " + new Date(dt).toLocaleString();
+
+      // (ADDED) Render featured image if present
+      const img = document.getElementById("featuredImage");
+      if(data.image_url){
+        img.src = data.image_url;
+        img.alt = data.title || "";
+        img.style.display = "block";
+      }else{
+        img.style.display = "none";
+        img.src = "";
+      }
 
       // If you want plain text only, swap innerHTML -> textContent.
       document.getElementById("body").innerHTML =
