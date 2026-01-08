@@ -281,7 +281,7 @@
     titleEl.value = a.title || "";
     slugEl.value = a.slug || "";
     excerptEl.value = a.excerpt || "";
-    contentEl.value = a.content || "";
+    contentEl.value = a.body || "";
     statusEl.value = a.status || "draft";
     setEditStatus("");
   }
@@ -327,7 +327,7 @@
     setListStatus("Loading…");
     const { data, error } = await supabase
       .from("articles")
-      .select("id,title,slug,excerpt,content,status,created_at,updated_at")
+      .select("id,title,slug,excerpt,body,status,created_at,updated_at")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -400,13 +400,13 @@
     const title = (titleEl.value || "").trim();
     const slug = (slugEl.value || "").trim();
     const excerpt = (excerptEl.value || "").trim();
-    const content = (contentEl.value || "").trim();
+    const body = (contentEl.value || "").trim();
     const status = statusEl.value;
 
     if (!title) return setEditStatus("Title is required.");
     if (!slug) return setEditStatus("Slug is required.");
-    if (!content) return setEditStatus("Content is required.");
-
+    if (!body) return setEditStatus("Content is required.");
+    
     btnSave.disabled = true;
     setEditStatus("Saving…");
 
@@ -414,7 +414,7 @@
       if (selectedArticleId) {
         const { error } = await supabase
           .from("articles")
-          .update({ title, slug, excerpt, content, status })
+          .update({ title, slug, excerpt, body, status })
           .eq("id", selectedArticleId);
 
         if (error) throw error;
@@ -422,7 +422,7 @@
       } else {
         const { data, error } = await supabase
           .from("articles")
-          .insert([{ title, slug, excerpt, content, status }])
+          .insert([{ title, slug, excerpt, body, status }])
           .select("id")
           .single();
 
