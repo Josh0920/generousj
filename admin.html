@@ -3,220 +3,482 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin Login</title>
+  <title>Admin — Articles</title>
   <style>
     :root{
-      --bg:#ffffff;
-      --text:#111111;
-      --muted:#555555;
-      --border:#d9d9d9;
-      --btn:#111111;
-      --btnText:#ffffff;
+      --bg:#fff; --text:#111; --muted:#666; --border:#ddd;
       --radius:12px;
+      --maxw:1100px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
     }
-    html, body { height:100%; }
+    *{box-sizing:border-box}
     body{
-      margin:0;
-      background:var(--bg);
-      color:var(--text);
+      margin:0; background:var(--bg); color:var(--text);
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display:flex;
-      align-items:center;
-      justify-content:center;
     }
-    .wrap{
-      width:100%;
-      max-width:420px;
-      padding:28px 18px;
+    header{
+      position:sticky; top:0; background:#fff;
+      border-bottom:1px solid var(--border);
+      padding:14px 18px;
+      display:flex; align-items:center; justify-content:space-between;
+      z-index:10;
     }
-    h1{
-      margin:0 0 8px;
-      font-size:22px;
-      letter-spacing:-0.01em;
-    }
-    p{
-      margin:0 0 18px;
-      color:var(--muted);
-      font-size:14px;
-      line-height:1.35;
-    }
-    label{
-      display:block;
-      margin:14px 0 6px;
-      font-size:13px;
-      color:var(--text);
-    }
-    input{
-      width:100%;
-      box-sizing:border-box;
-      padding:12px 12px;
+    header .title{font-weight:700; letter-spacing:-0.01em}
+    header .sub{font-size:12px; color:var(--muted)}
+    .wrap{max-width:var(--maxw); margin:0 auto; padding:18px}
+    .grid{display:grid; grid-template-columns: 360px 1fr; gap:16px}
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+    .card{
       border:1px solid var(--border);
       border-radius:var(--radius);
+      padding:14px;
+      background:#fff;
+    }
+    h2{margin:0 0 10px; font-size:15px}
+    label{display:block; font-size:12px; color:var(--muted); margin:10px 0 6px}
+    input, textarea, select{
+      width:100%;
+      padding:10px 10px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font-size:14px;
       background:#fff;
       color:var(--text);
-      font-size:15px;
       outline:none;
     }
-    input:focus{
-      border-color:#999;
-    }
-    .row{
-      display:flex;
-      gap:10px;
-      margin-top:14px;
-    }
+    textarea{min-height:260px; resize:vertical; font-family: var(--mono); font-size:13px; line-height:1.35}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    .row > *{flex:1}
     button{
-      width:100%;
-      padding:12px 12px;
-      border-radius:var(--radius);
-      border:1px solid var(--btn);
-      background:var(--btn);
-      color:var(--btnText);
-      font-weight:650;
-      font-size:15px;
-      cursor:pointer;
-    }
-    button.secondary{
-      background:#fff;
-      color:var(--text);
+      padding:10px 12px;
+      border-radius:10px;
       border:1px solid var(--border);
+      background:#fff;
+      cursor:pointer;
       font-weight:600;
     }
-    button[disabled]{opacity:.6;cursor:not-allowed}
-    .status{
-      margin-top:14px;
-      font-size:13px;
-      color:var(--muted);
-      white-space:pre-wrap;
-      border-top:1px solid #eee;
-      padding-top:12px;
-      min-height:18px;
+    button.primary{
+      border-color:#111;
+      background:#111;
+      color:#fff;
     }
+    button.danger{
+      border-color:#111;
+      background:#fff;
+      color:#111;
+    }
+    button[disabled]{opacity:.6; cursor:not-allowed}
+    .status{font-size:12px; color:var(--muted); white-space:pre-wrap; margin-top:10px}
+    .list{display:flex; flex-direction:column; gap:8px; margin-top:10px}
+    .item{
+      padding:10px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      cursor:pointer;
+    }
+    .item:hover{border-color:#bbb}
+    .pill{
+      display:inline-block;
+      font-size:11px;
+      padding:2px 8px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      color:var(--muted);
+      margin-left:8px;
+    }
+    .muted{color:var(--muted)}
+    .mono{font-family:var(--mono)}
+    .hidden{display:none !important}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Admin</h1>
-    <p>Sign in to create or edit articles.</p>
 
-    <form id="loginForm" autocomplete="on">
-      <label for="email">Email</label>
-      <input id="email" name="email" type="email" autocomplete="username" placeholder="you@email.com" required />
+<header>
+  <div>
+    <div class="title">Admin</div>
+    <div class="sub" id="who">Not signed in</div>
+  </div>
+  <div class="row" style="gap:8px;flex-wrap:nowrap">
+    <button id="btnNew" class="hidden">New</button>
+    <button id="btnSignOut" class="hidden">Sign out</button>
+  </div>
+</header>
 
-      <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Password" required />
+<div class="wrap">
 
-      <div class="row">
-        <button id="btnSignIn" type="submit">Sign in</button>
-        <button id="btnSignOut" class="secondary" type="button">Sign out</button>
+  <!-- LOGIN -->
+  <div id="loginCard" class="card" style="max-width:520px; margin:26px auto;">
+    <h2>Sign in</h2>
+    <form id="loginForm">
+      <label>Email</label>
+      <input id="email" type="email" autocomplete="username" required />
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <div class="row" style="margin-top:12px">
+        <button class="primary" type="submit" id="btnSignIn">Sign in</button>
       </div>
+      <div class="status" id="loginStatus"> </div>
     </form>
-
-    <div id="status" class="status">Ready.</div>
   </div>
 
-  <script type="module">
-    // === Supabase config (yours) ===
-    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+  <!-- DASHBOARD -->
+  <div id="dash" class="hidden">
+    <div class="grid">
 
-    // ✅ Redirect target (use absolute to avoid folder path issues)
-    const REDIRECT_TO = "/article.html";
+      <!-- LEFT: LIST -->
+      <div class="card">
+        <h2>Your articles</h2>
+        <div class="row">
+          <input id="search" placeholder="Search title/slug…" />
+          <select id="filterStatus" style="max-width:160px">
+            <option value="all">All</option>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+        </div>
+        <div class="list" id="articleList"></div>
+        <div class="status" id="listStatus"></div>
+      </div>
 
-    const statusEl = document.getElementById("status");
-    const form     = document.getElementById("loginForm");
-    const emailEl  = document.getElementById("email");
-    const passEl   = document.getElementById("password");
-    const btnIn    = document.getElementById("btnSignIn");
-    const btnOut   = document.getElementById("btnSignOut");
+      <!-- RIGHT: EDITOR -->
+      <div class="card">
+        <h2 id="editorTitle">Editor</h2>
 
-    function setStatus(msg) {
-      statusEl.textContent = msg;
-      console.log("[admin]", msg);
+        <label>Title</label>
+        <input id="title" placeholder="Article title" />
+
+        <div class="row">
+          <div>
+            <label>Slug (URL-friendly)</label>
+            <input id="slug" class="mono" placeholder="my-article-title" />
+          </div>
+          <div style="max-width:220px">
+            <label>Status</label>
+            <select id="status">
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Excerpt</label>
+        <input id="excerpt" placeholder="1–2 sentence summary (optional)" />
+
+        <label>Content (Markdown or plain text)</label>
+        <textarea id="content" placeholder="# Start writing…"></textarea>
+
+        <div class="row" style="margin-top:12px">
+          <button id="btnSave" class="primary">Save</button>
+          <button id="btnDelete" class="danger">Delete</button>
+        </div>
+
+        <div class="status" id="editStatus"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  // === Your Supabase ===
+  const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+
+  // --- DOM ---
+  const whoEl = document.getElementById("who");
+
+  const loginCard = document.getElementById("loginCard");
+  const dash = document.getElementById("dash");
+
+  const loginForm = document.getElementById("loginForm");
+  const emailEl = document.getElementById("email");
+  const passEl = document.getElementById("password");
+  const loginStatus = document.getElementById("loginStatus");
+  const btnSignIn = document.getElementById("btnSignIn");
+  const btnSignOut = document.getElementById("btnSignOut");
+  const btnNew = document.getElementById("btnNew");
+
+  const searchEl = document.getElementById("search");
+  const filterStatusEl = document.getElementById("filterStatus");
+  const articleListEl = document.getElementById("articleList");
+  const listStatusEl = document.getElementById("listStatus");
+
+  const editorTitleEl = document.getElementById("editorTitle");
+  const titleEl = document.getElementById("title");
+  const slugEl = document.getElementById("slug");
+  const statusEl = document.getElementById("status");
+  const excerptEl = document.getElementById("excerpt");
+  const contentEl = document.getElementById("content");
+  const editStatusEl = document.getElementById("editStatus");
+  const btnSave = document.getElementById("btnSave");
+  const btnDelete = document.getElementById("btnDelete");
+
+  const setLoginStatus = (m="") => (loginStatus.textContent = m);
+  const setListStatus  = (m="") => (listStatusEl.textContent = m);
+  const setEditStatus  = (m="") => (editStatusEl.textContent = m);
+
+  // --- Helpers ---
+  function slugify(str){
+    return (str || "")
+      .toLowerCase()
+      .trim()
+      .replace(/['"]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  function showAuthedUI(userEmail){
+    whoEl.textContent = userEmail ? `Signed in as ${userEmail}` : "Signed in";
+    loginCard.classList.add("hidden");
+    dash.classList.remove("hidden");
+    btnSignOut.classList.remove("hidden");
+    btnNew.classList.remove("hidden");
+  }
+
+  function showLoggedOutUI(){
+    whoEl.textContent = "Not signed in";
+    dash.classList.add("hidden");
+    loginCard.classList.remove("hidden");
+    btnSignOut.classList.add("hidden");
+    btnNew.classList.add("hidden");
+    setLoginStatus("");
+  }
+
+  // --- Load Supabase v2 ---
+  let createClient;
+  try {
+    ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
+  } catch (e) {
+    setLoginStatus("Failed to load Supabase library.");
+    throw e;
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+
+  // --- State ---
+  let currentUser = null;
+  let selectedArticleId = null;
+  let articlesCache = [];
+
+  function clearEditor(){
+    selectedArticleId = null;
+    editorTitleEl.textContent = "Editor (new)";
+    titleEl.value = "";
+    slugEl.value = "";
+    excerptEl.value = "";
+    contentEl.value = "";
+    statusEl.value = "draft";
+    setEditStatus("");
+  }
+
+  function fillEditor(a){
+    selectedArticleId = a.id;
+    editorTitleEl.textContent = "Editor (editing)";
+    titleEl.value = a.title || "";
+    slugEl.value = a.slug || "";
+    excerptEl.value = a.excerpt || "";
+    contentEl.value = a.content || "";
+    statusEl.value = a.status || "draft";
+    setEditStatus("");
+  }
+
+  function renderList(){
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const st = filterStatusEl.value;
+
+    const filtered = articlesCache.filter(a => {
+      const matchesText = !q || (a.title || "").toLowerCase().includes(q) || (a.slug || "").toLowerCase().includes(q);
+      const matchesStatus = (st === "all") || a.status === st;
+      return matchesText && matchesStatus;
+    });
+
+    articleListEl.innerHTML = "";
+    if (!filtered.length) {
+      articleListEl.innerHTML = `<div class="muted" style="padding:10px">No articles.</div>`;
+      return;
     }
 
-    // Load Supabase JS v2
-    let createClient;
+    for (const a of filtered) {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <div style="font-weight:650">${escapeHtml(a.title || "(untitled)")}
+          <span class="pill">${escapeHtml(a.status || "draft")}</span>
+        </div>
+        <div class="muted mono" style="font-size:12px; margin-top:4px;">/${escapeHtml(a.slug || "")}</div>
+        <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(a.updated_at || a.created_at).toLocaleString()}</div>
+      `;
+      div.addEventListener("click", () => fillEditor(a));
+      articleListEl.appendChild(div);
+    }
+  }
+
+  function escapeHtml(s){
+    return (s ?? "").replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  async function loadArticles(){
+    setListStatus("Loading…");
+    const { data, error } = await supabase
+      .from("articles")
+      .select("id,title,slug,excerpt,content,status,created_at,updated_at")
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      setListStatus("Error loading: " + error.message);
+      articlesCache = [];
+      renderList();
+      return;
+    }
+
+    articlesCache = data || [];
+    setListStatus("");
+    renderList();
+  }
+
+  // --- Events ---
+  titleEl.addEventListener("input", () => {
+    // Only auto-generate slug if creating new or slug is empty
+    if (!selectedArticleId && !slugEl.value.trim()) {
+      slugEl.value = slugify(titleEl.value);
+    }
+  });
+
+  btnNew.addEventListener("click", () => {
+    clearEditor();
+    titleEl.focus();
+  });
+
+  searchEl.addEventListener("input", renderList);
+  filterStatusEl.addEventListener("change", renderList);
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    setLoginStatus("");
+
+    const email = (emailEl.value || "").trim();
+    const password = passEl.value || "";
+
+    if (!email || !password) {
+      setLoginStatus("Enter email + password.");
+      return;
+    }
+
+    btnSignIn.disabled = true;
+    setLoginStatus("Signing in…");
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    btnSignIn.disabled = false;
+
+    if (error) {
+      setLoginStatus("Sign-in error: " + error.message);
+      return;
+    }
+
+    currentUser = data.user;
+    showAuthedUI(currentUser?.email);
+    clearEditor();
+    await loadArticles();
+  });
+
+  btnSignOut.addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    currentUser = null;
+    showLoggedOutUI();
+  });
+
+  btnSave.addEventListener("click", async () => {
+    setEditStatus("");
+
+    const title = (titleEl.value || "").trim();
+    const slug = (slugEl.value || "").trim();
+    const excerpt = (excerptEl.value || "").trim();
+    const content = (contentEl.value || "").trim();
+    const status = statusEl.value;
+
+    if (!title) return setEditStatus("Title is required.");
+    if (!slug) return setEditStatus("Slug is required.");
+    if (!content) return setEditStatus("Content is required.");
+
+    btnSave.disabled = true;
+    setEditStatus("Saving…");
+
     try {
-      ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2"));
-    } catch (e) {
-      setStatus("Failed to load Supabase library.");
-      throw e;
-    }
+      if (selectedArticleId) {
+        const { error } = await supabase
+          .from("articles")
+          .update({ title, slug, excerpt, content, status })
+          .eq("id", selectedArticleId);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    });
-
-    function redirectNow() {
-      setStatus("Redirecting…");
-      // small delay helps session persist before new page loads
-      setTimeout(() => {
-        window.location.href = REDIRECT_TO;
-      }, 120);
-    }
-
-    // If already signed in, redirect immediately on load
-    async function init() {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        setStatus("Session error: " + error.message);
-        return;
-      }
-      if (data.session) {
-        redirectNow();
+        if (error) throw error;
+        setEditStatus("Saved ✅");
       } else {
-        setStatus("Ready.");
+        const { data, error } = await supabase
+          .from("articles")
+          .insert([{ title, slug, excerpt, content, status }])
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        selectedArticleId = data.id;
+        editorTitleEl.textContent = "Editor (editing)";
+        setEditStatus("Created ✅");
       }
+
+      await loadArticles();
+    } catch (e) {
+      setEditStatus("Save error: " + (e?.message ?? String(e)));
+    } finally {
+      btnSave.disabled = false;
     }
+  });
 
-    // Login submit
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+  btnDelete.addEventListener("click", async () => {
+    if (!selectedArticleId) {
+      setEditStatus("Nothing to delete.");
+      return;
+    }
+    const ok = confirm("Delete this article? This cannot be undone.");
+    if (!ok) return;
 
-      const email = (emailEl.value || "").trim();
-      const password = passEl.value || "";
+    btnDelete.disabled = true;
+    setEditStatus("Deleting…");
 
-      if (!email || !password) {
-        setStatus("Enter email + password.");
-        return;
-      }
+    try {
+      const { error } = await supabase
+        .from("articles")
+        .delete()
+        .eq("id", selectedArticleId);
 
-      btnIn.disabled = true;
-      setStatus("Signing in…");
+      if (error) throw error;
 
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          setStatus("Sign-in error: " + error.message);
-          return;
-        }
-        if (data?.session || data?.user) {
-          redirectNow();
-        } else {
-          setStatus("Signed in, but no session returned.");
-        }
-      } catch (err) {
-        setStatus("Sign-in failed: " + (err?.message ?? String(err)));
-      } finally {
-        btnIn.disabled = false;
-      }
-    });
+      clearEditor();
+      setEditStatus("Deleted ✅");
+      await loadArticles();
+    } catch (e) {
+      setEditStatus("Delete error: " + (e?.message ?? String(e)));
+    } finally {
+      btnDelete.disabled = false;
+    }
+  });
 
-    // Sign out
-    btnOut.addEventListener("click", async () => {
-      btnOut.disabled = true;
-      setStatus("Signing out…");
-      try {
-        const { error } = await supabase.auth.signOut();
-        if (error) setStatus("Sign-out error: " + error.message);
-        else setStatus("Signed out.");
-      } finally {
-        btnOut.disabled = false;
-      }
-    });
-
-    await init();
-  </script>
+  // --- Boot: if already signed in, show dashboard ---
+  const { data: sess } = await supabase.auth.getSession();
+  if (sess?.session?.user) {
+    currentUser = sess.session.user;
+    showAuthedUI(currentUser.email);
+    clearEditor();
+    await loadArticles();
+  } else {
+    showLoggedOutUI();
+  }
+</script>
 </body>
 </html>
