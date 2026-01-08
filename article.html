@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Generous J Press — Article</title>
+  <style>
+    :root{--max:860px}
+    body{font-family:Georgia,"Times New Roman",Times,serif;margin:0;color:#111;background:#fff}
+    .wrap{max-width:var(--max);margin:0 auto;padding:22px}
+    header{border-bottom:1px solid #e5e5e5;padding-bottom:12px;margin-bottom:16px}
+    a{color:inherit}
+    h1{font-size:36px;letter-spacing:-.3px;margin:10px 0}
+    .muted{color:#555;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px}
+    .body{font-size:18px;line-height:1.6}
+    .rule{border-top:1px solid #e5e5e5;margin:18px 0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="muted"><a href="index.html">← Back to Generous J Press</a></div>
+      <h1 id="title">Loading…</h1>
+      <div class="muted" id="meta"></div>
+    </header>
+
+    <div class="body" id="body"></div>
+
+    <div class="rule"></div>
+    <div class="muted">© <span id="y"></span> Generous J Press</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    document.getElementById("y").textContent = String(new Date().getFullYear());
+
+    const params = new URLSearchParams(location.search);
+    const slug = params.get("slug");
+
+    async function run(){
+      if(!slug){
+        document.getElementById("title").textContent = "Article not found";
+        document.getElementById("body").textContent = "Missing slug.";
+        return;
+      }
+
+      // Public policy should allow only published articles
+      const { data, error } = await sb
+        .from("articles")
+        .select("title,body,excerpt,published_at,updated_at,status,slug")
+        .eq("slug", slug)
+        .single();
+
+      if(error || !data){
+        document.getElementById("title").textContent = "Article not found";
+        document.getElementById("body").textContent = "This article may be a draft or does not exist.";
+        return;
+      }
+
+      document.title = data.title + " — Generous J Press";
+      document.getElementById("title").textContent = data.title;
+
+      const dt = data.published_at || data.updated_at;
+      document.getElementById("meta").textContent =
+        "Published: " + new Date(dt).toLocaleString();
+
+      // If you want plain text only, swap innerHTML -> textContent.
+      document.getElementById("body").innerHTML =
+        (data.body || "").replace(/\n/g, "<br>");
+    }
+    run();
+  </script>
+</body>
+</html>
