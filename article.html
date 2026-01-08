@@ -54,7 +54,7 @@
       // Public policy should allow only published articles
       const { data, error } = await sb
         .from("articles")
-        .select("title,body,excerpt,published_at,updated_at,status,slug,image_url")
+        .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
         .eq("slug", slug)
         .single();
 
@@ -71,13 +71,21 @@
       document.getElementById("meta").textContent =
         "Published: " + new Date(dt).toLocaleString();
 
-      // (ADDED) Render featured image if present
+      // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
       const img = document.getElementById("featuredImage");
-      if(data.image_url){
-        img.src = data.image_url;
-        img.alt = data.title || "";
-        img.style.display = "block";
-      }else{
+      if (data.image_path) {
+        const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
+        const url = pub && pub.publicUrl;
+
+        if (url) {
+          img.src = url;
+          img.alt = data.image_alt || data.title || "";
+          img.style.display = "block";
+        } else {
+          img.style.display = "none";
+          img.src = "";
+        }
+      } else {
         img.style.display = "none";
         img.src = "";
       }
