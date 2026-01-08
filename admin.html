@@ -73,15 +73,16 @@
         <textarea id="excerpt" style="min-height:90px" placeholder="Short summary for the homepage..."></textarea>
 
         <div style="height:10px"></div>
-<div style="height:10px"></div>
-<label>Featured Image</label>
-<input id="imageFile" type="file" accept="image/*" />
-<div class="muted" style="margin-top:6px;">
-  Upload an image, then save the article. (JPG/PNG recommended)
-</div>
-<div style="height:10px"></div>
-<img id="imagePreview" alt="" style="display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;" />
-<input id="imageUrl" type="text" placeholder="Image URL (auto-filled after upload)" readonly />
+        <div style="height:10px"></div>
+        <label>Featured Image</label>
+        <input id="imageFile" type="file" accept="image/*" />
+        <div class="muted" style="margin-top:6px;">
+          Upload an image, then save the article. (JPG/PNG recommended)
+        </div>
+        <div style="height:10px"></div>
+        <img id="imagePreview" alt="" style="display:none; max-width:100%; border:1px solid #ddd; border-radius:12px;" />
+        <input id="imageUrl" type="text" placeholder="Image URL (auto-filled after upload)" readonly />
+
         <label>Body (plain text or basic HTML)</label>
         <textarea id="body" placeholder="Write your article..."></textarea>
 
@@ -119,16 +120,18 @@
   <script>
     // Your Supabase credentials (safe to use on the client)
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-    const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_PUBLIC_KEY_HERE";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-function withTimeout(promise, ms){
-  return Promise.race([
-    promise,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Sign-in request timed out (blocked or not reaching Supabase).")), ms)
-    )
-  ]);
-}
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function withTimeout(promise, ms){
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Sign-in request timed out (blocked or not reaching Supabase).")), ms)
+        )
+      ]);
+    }
+
     const who = document.getElementById("who");
     const logoutBtn = document.getElementById("logoutBtn");
     const authCard = document.getElementById("authCard");
@@ -152,7 +155,7 @@ function withTimeout(promise, ms){
     const saveMsg = document.getElementById("saveMsg");
     const list = document.getElementById("list");
 
-    // (ADDED) Featured image controls
+    // Featured image controls
     const imageFile = document.getElementById("imageFile");
     const imagePreview = document.getElementById("imagePreview");
     const imageUrl = document.getElementById("imageUrl");
@@ -181,7 +184,7 @@ function withTimeout(promise, ms){
         .replaceAll("'","&#039;");
     }
 
-    // (ADDED) Upload image to Supabase Storage if a new file is selected
+    // Upload image to Supabase Storage if a new file is selected
     async function uploadFeaturedImageIfNeeded(){
       const file = imageFile?.files?.[0];
       if(!file) return imageUrl.value.trim() || null;
@@ -207,7 +210,7 @@ function withTimeout(promise, ms){
       return data.publicUrl;
     }
 
-    // (ADDED) Immediate preview when choosing a file
+    // Immediate preview when choosing a file
     imageFile.addEventListener("change", () => {
       const f = imageFile.files?.[0];
       if(!f){
@@ -251,7 +254,7 @@ function withTimeout(promise, ms){
       body.value = "";
       status.value = "draft";
 
-      // (ADDED) reset image inputs
+      // reset image inputs
       imageFile.value = "";
       imageUrl.value = "";
       imagePreview.style.display = "none";
@@ -263,8 +266,6 @@ function withTimeout(promise, ms){
     async function loadMyArticles(){
       list.innerHTML = "Loading…";
 
-      // NOTE: Your RLS policies should allow the editor to see their drafts.
-      // If you haven't added that policy yet, you may only see published articles here.
       const { data, error } = await sb
         .from("articles")
         .select("id,title,slug,status,published_at,updated_at,created_at")
@@ -316,7 +317,7 @@ function withTimeout(promise, ms){
       body.value = data.body || "";
       status.value = data.status || "draft";
 
-      // (ADDED) load image url + preview
+      // load image url + preview
       imageUrl.value = data.image_url || "";
       if(data.image_url){
         imagePreview.src = data.image_url;
@@ -343,7 +344,7 @@ function withTimeout(promise, ms){
 
       const isPublishing = status.value === "published";
 
-      // (ADDED) Upload image if selected; otherwise keep existing imageUrl
+      // Upload image if selected; otherwise keep existing imageUrl
       let uploadedUrl = null;
       try{
         uploadedUrl = await uploadFeaturedImageIfNeeded();
@@ -364,8 +365,6 @@ function withTimeout(promise, ms){
         updated_at: new Date().toISOString(),
         author_id: currentUser.id,
         published_at: isPublishing ? new Date().toISOString() : null,
-
-        // (ADDED) featured image URL
         image_url: uploadedUrl
       };
 
@@ -409,24 +408,27 @@ function withTimeout(promise, ms){
 
     loginBtn.onclick = async () => {
       setMsg(authMsg, "Signing in…");
+
       let result;
-try{
-  result = await withTimeout(
-    sb.auth.signInWithPassword({
-      email: email.value.trim(),
-      password: password.value
-    }),
-    12000
-  ); 
-}catch(e){
-  setMsg(authMsg, "Sign-in failed: " + e.message);
-  return;
-}
-const { error } = result;
+      try{
+        result = await withTimeout(
+          sb.auth.signInWithPassword({
+            email: email.value.trim(),
+            password: password.value
+          }),
+          12000
+        );
+      }catch(e){
+        setMsg(authMsg, "Sign-in failed: " + e.message);
+        return;
+      }
+
+      const { error } = result;
       if(error){
         setMsg(authMsg, "Sign-in failed: " + error.message);
         return;
       }
+
       setMsg(authMsg, "");
       await refreshSession();
     };
