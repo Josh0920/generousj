@@ -395,51 +395,55 @@
   });
 
   btnSave.addEventListener("click", async () => {
-    setEditStatus("");
+  setEditStatus("");
 
-    const title = (titleEl.value || "").trim();
-    const slug = (slugEl.value || "").trim();
-    const excerpt = (excerptEl.value || "").trim();
-    const body = (contentEl.value || "").trim();
-    const status = statusEl.value;
+  const title = (titleEl.value || "").trim();
+  const slug = (slugEl.value || "").trim();
+  const excerpt = (excerptEl.value || "").trim();
 
-    if (!title) return setEditStatus("Title is required.");
-    if (!slug) return setEditStatus("Slug is required.");
-    if (!body) return setEditStatus("Content is required.");
-    
-    btnSave.disabled = true;
-    setEditStatus("Saving…");
+  // ✅ THIS IS THE IMPORTANT LINE
+  const body = (contentEl.value || "").trim();
 
-    try {
-      if (selectedArticleId) {
-        const { error } = await supabase
-          .from("articles")
-          .update({ title, slug, excerpt, body, status })
-          .eq("id", selectedArticleId);
+  const status = statusEl.value;
 
-        if (error) throw error;
-        setEditStatus("Saved ✅");
-      } else {
-        const { data, error } = await supabase
-          .from("articles")
-          .insert([{ title, slug, excerpt, body, status }])
-          .select("id")
-          .single();
+  if (!title) return setEditStatus("Title is required.");
+  if (!slug) return setEditStatus("Slug is required.");
+  if (!body) return setEditStatus("Content is required.");
 
-        if (error) throw error;
-        selectedArticleId = data.id;
-        editorTitleEl.textContent = "Editor (editing)";
-        setEditStatus("Created ✅");
-      }
+  btnSave.disabled = true;
+  setEditStatus("Saving…");
 
-      await loadArticles();
-    } catch (e) {
-      setEditStatus("Save error: " + (e?.message ?? String(e)));
-    } finally {
-      btnSave.disabled = false;
+  try {
+    if (selectedArticleId) {
+      // UPDATE
+      const { error } = await supabase
+        .from("articles")
+        .update({ title, slug, excerpt, body, status })
+        .eq("id", selectedArticleId);
+
+      if (error) throw error;
+      setEditStatus("Saved ✅");
+    } else {
+      // INSERT
+      const { data, error } = await supabase
+        .from("articles")
+        .insert([{ title, slug, excerpt, body, status }])
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      selectedArticleId = data.id;
+      editorTitleEl.textContent = "Editor (editing)";
+      setEditStatus("Created ✅");
     }
-  });
 
+    await loadArticles();
+  } catch (e) {
+    setEditStatus("Save error: " + (e?.message ?? String(e)));
+  } finally {
+    btnSave.disabled = false;
+  }
+});
   btnDelete.addEventListener("click", async () => {
     if (!selectedArticleId) {
       setEditStatus("Nothing to delete.");
