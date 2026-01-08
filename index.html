@@ -345,6 +345,7 @@
 
       <nav aria-label="Primary">
         <div class="navrow">
+          <a href="admin.html" rel="nofollow">Editor Login</a>
           <a href="#">U.S.</a>
           <a href="#">World</a>
           <a href="#">Politics</a>
@@ -365,51 +366,29 @@
   <main>
     <div class="wrap">
       <div class="grid">
-        <!-- Left column -->
-        <aside class="leftRail">
-          <div class="sectionlabel">Top Stories</div>
+       <!-- Left column -->
+<aside class="leftRail">
+  <div class="sectionlabel">Top Stories</div>
 
-          <article class="story">
-            <div class="kicker">Politics</div>
-            <h2 class="headline sm"><a href="#">A Key Committee Advances a Sweeping Reform Package</a></h2>
-            <p class="byline">By Staff Reporter</p>
-            <p class="dek">Lawmakers signaled momentum after weeks of closed-door negotiation; opponents promise a floor fight.</p>
-            <div class="metaRow"><span>6 min read</span><span>•</span><span>Updated 1h ago</span></div>
-          </article>
+  <!-- Supabase fills Top Stories here -->
+  <div id="top-stories"></div>
 
-          <article class="story">
-            <div class="kicker">Business</div>
-            <h2 class="headline sm"><a href="#">Markets Recalibrate After Fresh Data Shifts Rate Expectations</a></h2>
-            <p class="byline">By Markets Desk</p>
-            <p class="dek">Investors weighed inflation signals against slowing growth as bonds moved sharply.</p>
-            <div class="metaRow"><span>5 min read</span><span>•</span><span>Live</span></div>
-          </article>
+  <div class="rule strong"></div>
 
-          <article class="story">
-            <div class="kicker">World</div>
-            <h2 class="headline sm"><a href="#">A Fragile Cease-Fire Holds as Aid Convoys Begin Moving</a></h2>
-            <p class="byline">By International Desk</p>
-            <p class="dek">Negotiators described “cautious optimism,” though clashes flared at the edges of the corridor.</p>
-            <div class="metaRow"><span>7 min read</span><span>•</span><span>Updated 30m ago</span></div>
-          </article>
+  <div class="sectionlabel">In Brief</div>
 
-          <div class="rule strong"></div>
-
-          <div class="sectionlabel">In Brief</div>
-
-          <article class="story">
-            <h3 class="headline xs"><a href="#">Tech firms announce new safety standards for generative tools</a></h3>
-            <div class="metaRow"><span>2 min read</span></div>
-          </article>
-          <article class="story">
-            <h3 class="headline xs"><a href="#">A winter storm disrupts travel across multiple regions</a></h3>
-            <div class="metaRow"><span>3 min read</span></div>
-          </article>
-          <article class="story">
-            <h3 class="headline xs"><a href="#">Scientists map a promising pathway for cleaner industrial heat</a></h3>
-            <div class="metaRow"><span>4 min read</span></div>
-          </article>
-        </aside>
+  <article class="story">
+    <h3 class="headline xs"><a href="#">Tech firms announce new safety standards for generative tools</a></h3>
+    <div class="metaRow"><span>2 min read</span></div>
+  </article>
+  <article class="story">
+    <h3 class="headline xs"><a href="#">A winter storm disrupts travel across multiple regions</a></h3>
+    <div class="metaRow"><span>3 min read</span></div>
+  </article>
+  <article class="story">
+    <h3 class="headline xs"><a href="#">Scientists map a promising pathway for cleaner industrial heat</a></h3>
+    <div class="metaRow"><span>4 min read</span></div>
+  </article>
 
         <!-- Center column -->
         <section class="center">
@@ -518,6 +497,41 @@
         </aside>
       </div>
     </div>
+    <!-- ===== Lead + Top Stories placeholders (filled by Supabase JS) ===== -->
+<section id="homepage-stories" style="margin-top:24px;">
+
+  <!-- Lead Story -->
+  <div id="lead-story" style="margin-bottom:28px;">
+    <!-- Filled by JS -->
+  </div>
+
+  <!-- Layout: left (main) + right (top stories) -->
+  <div style="display:grid; grid-template-columns: 2fr 1fr; gap:24px; align-items:start;">
+
+    <!-- Main column (leave empty for now OR put other homepage blocks here) -->
+    <div></div>
+
+    <!-- Top Stories -->
+    <aside>
+      <div style="
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: #555;
+        margin-bottom: 12px;
+      ">
+        Top Stories
+      </div>
+
+      <div id="top-stories" style="display:grid; gap:14px;">
+        <!-- Filled by JS -->
+      </div>
+    </aside>
+
+  </div>
+</section>
   </main>
 
   <footer>
@@ -563,4 +577,126 @@
     })();
   </script>
 </body>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function loadHomepageStories(){
+    const lead = document.getElementById("lead-story");
+    const top = document.getElementById("top-stories");
+
+    const { data, error } = await sb
+      .from("articles")
+      .select("title, slug, excerpt, published_at, updated_at")
+      .eq("status", "published")
+      .order("published_at", { ascending: false })
+      .limit(7);
+
+    if(error || !data || data.length === 0){
+      lead.textContent = "No stories published yet.";
+      return;
+    }
+
+    const escapeHtml = (s) =>
+      String(s || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+
+    const formatDate = (d) =>
+      new Date(d).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
+
+    /* ===== LEAD STORY (newest) ===== */
+    const leadStory = data[0];
+    const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
+
+    lead.innerHTML = `
+      <article>
+        <div style="
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: .04em;
+          text-transform: uppercase;
+          color: #555;
+          margin-bottom: 6px;
+        ">
+          Lead Story
+        </div>
+
+        <h1 style="
+          font-family: Georgia, 'Times New Roman', Times, serif;
+          font-size: 36px;
+          font-weight: 800;
+          letter-spacing: -0.3px;
+          margin: 0 0 10px;
+        ">
+          <a href="article.html?slug=${encodeURIComponent(leadStory.slug)}">
+            ${escapeHtml(leadStory.title)}
+          </a>
+        </h1>
+
+        <div style="
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+          font-size: 12px;
+          color: #555;
+          margin-bottom: 10px;
+        ">
+          ${leadDate}
+        </div>
+
+        <p style="
+          font-family: Georgia, 'Times New Roman', Times, serif;
+          font-size: 16px;
+          color: #222;
+          max-width: 640px;
+          margin: 0;
+        ">
+          ${escapeHtml(leadStory.excerpt || "")}
+        </p>
+      </article>
+    `;
+
+    /* ===== TOP STORIES (older) ===== */
+    top.innerHTML = "";
+
+    data.slice(1).forEach(story => {
+      const d = formatDate(story.published_at || story.updated_at);
+
+      const item = document.createElement("article");
+      item.style.borderBottom = "1px solid #e5e5e5";
+      item.style.paddingBottom = "10px";
+
+      item.innerHTML = `
+        <h3 style="
+          font-family: Georgia, 'Times New Roman', Times, serif;
+          font-size: 18px;
+          font-weight: 700;
+          letter-spacing: -0.2px;
+          margin: 0 0 4px;
+        ">
+          <a href="article.html?slug=${encodeURIComponent(story.slug)}">
+            ${escapeHtml(story.title)}
+          </a>
+        </h3>
+
+        <div style="
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+          font-size: 12px;
+          color: #555;
+        ">
+          ${d}
+        </div>
+      `;
+
+      top.appendChild(item);
+    });
+  }
+
+  loadHomepageStories();
+</script>
 </html>
