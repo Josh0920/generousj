@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>The Generous J Press RSS</title>
+</head>
+<body>
+<pre id="rss"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const SITE_URL = "https://YOURDOMAIN.com"; // ← CHANGE THIS
+
+function escapeXML(str){
+  return String(str || "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&apos;");
+}
+
+async function buildRSS(){
+  const { data } = await sb
+    .from("articles")
+    .select("title, slug, excerpt, published_at, updated_at")
+    .eq("status","published");
+
+  data.sort((a,b)=>{
+    const ad = new Date(a.published_at||a.updated_at).getTime();
+    const bd = new Date(b.published_at||b.updated_at).getTime();
+    return bd-ad;
+  });
+
+  let items = "";
+
+  data.forEach(a=>{
+    const date = new Date(a.published_at||a.updated_at).toUTCString();
+    const link = `${SITE_URL}/article.html?slug=${encodeURIComponent(a.slug)}`;
+
+    items += `
+<item>
+  <title>${escapeXML(a.title)}</title>
+  <link>${link}</link>
+  <guid>${link}</guid>
+  <pubDate>${date}</pubDate>
+  <description>${escapeXML(a.excerpt||"")}</description>
+</item>`;
+  });
+
+  const rss = `<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+<channel>
+<title>The Generous J Press</title>
+<link>${SITE_URL}</link>
+<description>Independent reporting and analysis</description>
+${items}
+</channel>
+</rss>`;
+
+  document.getElementById("rss").textContent = rss;
+}
+
+buildRSS();
+</script>
+</body>
+</html>
