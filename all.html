@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Generous J Press — All Articles</title>
+  <meta name="description" content="The Generous J Press — All published articles." />
+  <style>
+    :root{
+      --bg:#ffffff;
+      --ink:#0a0a0a;
+      --muted:#5a5a5a;
+      --rule:#e5e5e5;
+      --rule-strong:#cfcfcf;
+      --accent:#111;
+      --max:860px;
+      --serif: ui-serif, Georgia, "Times New Roman", Times, serif;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    *{ box-sizing:border-box; }
+    body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--serif); }
+    a{ color:inherit; text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    .wrap{ max-width:var(--max); margin:0 auto; padding:22px 16px 40px; }
+    header{ border-bottom:1px solid var(--rule-strong); padding-bottom:14px; margin-bottom:16px; }
+
+    .toprow{
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:12px;
+    }
+    h1{ margin:0; font-size:34px; letter-spacing:-.3px; }
+    .muted{ font-family:var(--sans); font-size:12px; color:var(--muted); }
+
+    .btn{
+      font-family:var(--sans);
+      font-size:12px;
+      border:1px solid var(--rule-strong);
+      padding:6px 10px;
+      border-radius:6px;
+      background:#f8f8f8;
+      cursor:pointer;
+    }
+
+    .story{
+      padding:14px 0;
+      border-bottom:1px solid var(--rule);
+    }
+    .headline{
+      margin:0 0 6px;
+      font-size:20px;
+      font-weight:800;
+      letter-spacing:-.2px;
+    }
+    .metaRow{
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-bottom:6px;
+    }
+    .dek{ margin:0; font-size:14px; color:#222; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="toprow">
+        <div>
+          <h1>All Articles</h1>
+          <div class="muted">Every published story on The Generous J Press.</div>
+        </div>
+        <a class="btn" href="index.html">← Home</a>
+      </div>
+    </header>
+
+    <div id="all-stories" class="muted">Loading…</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const escapeHtml = (s) =>
+      String(s || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+
+    const formatDate = (d) =>
+      new Date(d).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
+
+    async function loadAll(){
+      const host = document.getElementById("all-stories");
+
+      const { data, error } = await sb
+        .from("articles")
+        .select("title, slug, excerpt, published_at, updated_at")
+        .eq("status", "published")
+        .order("published_at", { ascending: false });
+
+      if(error){
+        host.textContent = "Error loading articles.";
+        return;
+      }
+      if(!data || data.length === 0){
+        host.textContent = "No published articles yet.";
+        return;
+      }
+
+      host.className = "";
+      host.innerHTML = "";
+
+      data.forEach(story => {
+        const d = formatDate(story.published_at || story.updated_at);
+
+        const item = document.createElement("article");
+        item.className = "story";
+        item.innerHTML = `
+          <h2 class="headline">
+            <a href="article.html?slug=${encodeURIComponent(story.slug)}">
+              ${escapeHtml(story.title)}
+            </a>
+          </h2>
+          <div class="metaRow"><span>${d}</span></div>
+          ${story.excerpt ? `<p class="dek">${escapeHtml(story.excerpt)}</p>` : ""}
+        `;
+        host.appendChild(item);
+      });
+    }
+
+    loadAll();
+  </script>
+</body>
+</html>
