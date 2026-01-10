@@ -354,7 +354,9 @@
 
         <div class="tools meta">
           <button class="btn" type="button">Today’s Paper</button>
-          <button class="btn" type="button">Newsletters</button>
+          <a class="btn" href="https://thegenerousjpress.beehiiv.com/subscribe" target="_blank" rel="noopener">
+  Newsletters
+</a>
         </div>
       </div>
 
@@ -414,16 +416,19 @@
             <p style="margin:0 0 10px; font-family:var(--sans); color:var(--muted); font-size:12px;">
               Get the Generous J briefing: headlines, context, and one great read.
             </p>
-            <form onsubmit="event.preventDefault(); alert('Demo form — connect to your email service.');">
-              <label style="display:block; font-family:var(--sans); font-size:12px; margin-bottom:6px;">Email</label>
-              <input
-                type="email"
-                required
-                placeholder="you@example.com"
-                style="width:100%; padding:10px; border:1px solid var(--rule-strong); border-radius:8px; font-family:var(--sans);"
-              />
-              <button class="btn primary" style="width:100%; margin-top:10px;" type="submit">Sign Up</button>
-            </form>
+           <form action="https://thegenerousjpress.beehiiv.com/subscribe" method="get" target="_blank">
+  <label style="display:block; font-family:var(--sans); font-size:12px; margin-bottom:6px;">Email</label>
+  <input
+    name="email"
+    type="email"
+    required
+    placeholder="you@example.com"
+    style="width:100%; padding:10px; border:1px solid var(--rule-strong); border-radius:8px; font-family:var(--sans);"
+  />
+  <button class="btn primary" style="width:100%; margin-top:10px;" type="submit">
+    Sign Up
+  </button>
+</form>
           </div>
 
           <div style="height:14px"></div>
