@@ -14,42 +14,6 @@
     .muted{color:#555;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px}
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
-
-    .engage{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    .engage h3{margin:0 0 10px;font-size:14px;color:#111}
-    .reactions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .btn{
-      appearance:none;border:1px solid #e5e5e5;background:#fff;color:#111;
-      padding:8px 10px;border-radius:999px;cursor:pointer;font-size:14px;
-    }
-    .btn:hover{background:#f7f7f7}
-    .btn:disabled{opacity:.6;cursor:not-allowed}
-    .count{color:#555;font-size:13px}
-    .commentForm{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-    .commentForm input{
-      width:100%;border:1px solid #e5e5e5;border-radius:10px;padding:10px;font:inherit
-    }
-    .commentForm .row{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
-    @media (min-width:620px){ .commentForm .row{grid-template-columns:220px 1fr} }
-    .commentList{margin:10px 0 0;padding:0;list-style:none}
-    .comment{
-      border:1px solid #e5e5e5;border-radius:14px;padding:12px;margin:10px 0
-    }
-    .commentTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-    .commentMeta{color:#555;font-size:12px}
-    .commentBody{margin:8px 0 0;font-size:14px;line-height:1.5}
-    .smallBtn{
-      border:1px solid #e5e5e5;background:#fff;border-radius:10px;
-      padding:6px 8px;cursor:pointer;font-size:12px
-    }
-    .smallBtn:hover{background:#f7f7f7}
-
-    .err{
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      border:1px solid #ffd0d0;background:#fff5f5;color:#7a1414;
-      padding:12px;border-radius:12px;margin:14px 0;
-      white-space:pre-wrap;
-    }
   </style>
 </head>
 <body>
@@ -60,35 +24,12 @@
       <div class="muted" id="meta"></div>
     </header>
 
+    <!-- (ADDED) Featured image placeholder -->
     <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
-
-    <div id="errorBox" class="err" style="display:none;"></div>
 
     <div class="body" id="body"></div>
 
     <div class="rule"></div>
-
-    <section class="engage" id="engagement" style="margin:18px 0;">
-      <h3>Feedback</h3>
-
-      <div class="reactions" style="margin-bottom:12px;">
-        <button class="btn" id="likeBtn">👍 Like <span class="count" id="likeCount">0</span></button>
-        <button class="btn" id="dislikeBtn">👎 Dislike <span class="count" id="dislikeCount">0</span></button>
-        <span class="count" id="reactStatus"></span>
-      </div>
-
-      <form class="commentForm" id="commentForm">
-        <div class="row">
-          <input id="commentName" maxlength="40" placeholder="Name (optional)" />
-          <input id="commentBody" maxlength="500" placeholder="Write a comment…" required />
-        </div>
-        <button class="btn" type="submit">Post Comment</button>
-        <span class="count" id="commentStatus"></span>
-      </form>
-
-      <ul class="commentList" id="commentList"></ul>
-    </section>
-
     <div class="muted">© <span id="y"></span> The Generous J Press</div>
   </div>
 
@@ -101,263 +42,25 @@
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
     const params = new URLSearchParams(location.search);
-    const slugParam = params.get("slug"); // your current link style
-    const idParam = params.get("id");     // optional future link style
-
-    const likeBtn = document.getElementById("likeBtn");
-    const dislikeBtn = document.getElementById("dislikeBtn");
-    const likeCount = document.getElementById("likeCount");
-    const dislikeCount = document.getElementById("dislikeCount");
-    const reactStatus = document.getElementById("reactStatus");
-
-    const commentForm = document.getElementById("commentForm");
-    const commentName = document.getElementById("commentName");
-    const commentBody = document.getElementById("commentBody");
-    const commentStatus = document.getElementById("commentStatus");
-    const commentList = document.getElementById("commentList");
-
-    const errorBox = document.getElementById("errorBox");
-    function showErr(msg){
-      errorBox.style.display = "block";
-      errorBox.textContent = msg;
-    }
-
-    function escapeHtml(s){
-      return (s || "").replace(/[&<>"']/g, (c) => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[c]));
-    }
-
-    // --- Likes/Dislikes via REST (guarantees apikey header) ---
-    function supaHeaders(){
-      return {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-        "Prefer": "return=representation, resolution=merge-duplicates"
-      };
-    }
-
-    function statsKey(){
-      // always use slugParam for stats for now (your comments do the same)
-      return slugParam || "";
-    }
-
-    async function statsEnsure(slug){
-      if (!slug) return;
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/article_stats`, {
-        method: "POST",
-        headers: supaHeaders(),
-        body: JSON.stringify({ slug })
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        console.error("statsEnsure error:", t);
-      }
-    }
-
-    async function statsLoad(slug){
-      if (!slug) return;
-      const url = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
-      const res = await fetch(url, { headers: supaHeaders() });
-
-      if (!res.ok) {
-        const t = await res.text();
-        console.error("statsLoad error:", t);
-        likeCount.textContent = "0";
-        dislikeCount.textContent = "0";
-        return;
-      }
-
-      const rows = await res.json();
-      const row = rows?.[0] || { likes: 0, dislikes: 0 };
-      likeCount.textContent = String(row.likes ?? 0);
-      dislikeCount.textContent = String(row.dislikes ?? 0);
-    }
-
-    async function statsBump(slug, field){
-      reactStatus.textContent = "Saving…";
-      likeBtn.disabled = true;
-      dislikeBtn.disabled = true;
-
-      try{
-        const getUrl = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
-        const getRes = await fetch(getUrl, { headers: supaHeaders() });
-        if (!getRes.ok) throw new Error(await getRes.text());
-
-        const rows = await getRes.json();
-        const cur = rows?.[0] || { likes: 0, dislikes: 0 };
-
-        const next = {
-          likes: (cur.likes ?? 0) + (field === "likes" ? 1 : 0),
-          dislikes: (cur.dislikes ?? 0) + (field === "dislikes" ? 1 : 0),
-          updated_at: new Date().toISOString()
-        };
-
-        const patchUrl = `${SUPABASE_URL}/rest/v1/article_stats?slug=eq.${encodeURIComponent(slug)}`;
-        const patchRes = await fetch(patchUrl, {
-          method: "PATCH",
-          headers: supaHeaders(),
-          body: JSON.stringify(next)
-        });
-
-        if (!patchRes.ok) throw new Error(await patchRes.text());
-
-        await statsLoad(slug);
-        reactStatus.textContent = "Saved.";
-      } catch (e){
-        console.error("statsBump error:", e);
-        reactStatus.textContent = "Couldn’t save.";
-      } finally {
-        likeBtn.disabled = false;
-        dislikeBtn.disabled = false;
-        setTimeout(() => (reactStatus.textContent = ""), 1200);
-      }
-    }
-
-    async function initReactions(){
-      const key = statsKey();
-      if (!key) return;
-      await statsEnsure(key);
-      await statsLoad(key);
-      likeBtn.addEventListener("click", () => statsBump(key, "likes"));
-      dislikeBtn.addEventListener("click", () => statsBump(key, "dislikes"));
-    }
-
-    // --- Comments (assumes article_comments has "slug") ---
-    async function loadComments(){
-      commentList.innerHTML = "";
-
-      const { data, error } = await sb
-        .from("article_comments")
-        .select("id, name, body, created_at")
-        .eq("slug", slugParam)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("loadComments error:", error);
-        commentList.innerHTML = `<li class="muted">Could not load comments.</li>`;
-        return;
-      }
-
-      if (!data || data.length === 0){
-        commentList.innerHTML = `<li class="muted">No comments yet.</li>`;
-        return;
-      }
-
-      data.forEach(c => {
-        const li = document.createElement("li");
-        li.className = "comment";
-        li.innerHTML = `
-          <div class="commentTop">
-            <div>
-              <div><strong>${escapeHtml(c.name || "Anonymous")}</strong></div>
-              <div class="commentMeta">${new Date(c.created_at).toLocaleString()}</div>
-            </div>
-          </div>
-          <div class="commentBody">${escapeHtml(c.body)}</div>
-        `;
-        commentList.appendChild(li);
-      });
-    }
-
-    commentForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (!slugParam) return;
-
-      const name = (commentName.value || "").trim() || "Anonymous";
-      const body = (commentBody.value || "").trim();
-
-      if (!body){
-        commentStatus.textContent = "Write something first.";
-        return;
-      }
-
-      commentStatus.textContent = "Posting…";
-      const { error } = await sb.from("article_comments").insert({ slug: slugParam, name, body });
-
-      if (error){
-        console.error("comment insert error:", error);
-        commentStatus.textContent = "Post failed.";
-        return;
-      }
-
-      commentBody.value = "";
-      commentStatus.textContent = "Posted.";
-      await loadComments();
-      setTimeout(() => (commentStatus.textContent = ""), 1200);
-    });
-
-    // --- Article loader: tries slug, id, title exact, then title ilike ---
-    async function fetchArticle(){
-      if (!slugParam && !idParam) return { data: null, error: { message: "Missing ?slug= or ?id=" } };
-
-      // 1) by id if provided
-      if (idParam) {
-        const res = await sb
-          .from("articles")
-          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-          .eq("id", idParam)
-          .single();
-        if (!res.error) return res;
-      }
-
-      // 2) by slug (if column exists)
-      if (slugParam) {
-        const resSlug = await sb
-          .from("articles")
-          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-          .eq("slug", slugParam)
-          .single();
-
-        if (!resSlug.error) return resSlug;
-
-        // If slug column does not exist, fall through
-        const msg = (resSlug.error.message || "").toLowerCase();
-        if (!(msg.includes("column") && msg.includes("slug"))) {
-          // Could just be "no rows" — continue to title matching too
-        }
-      }
-
-      // 3) exact title match
-      if (slugParam) {
-        const resTitle = await sb
-          .from("articles")
-          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-          .eq("title", slugParam)
-          .single();
-        if (!resTitle.error) return resTitle;
-      }
-
-      // 4) case-insensitive contains match (ilike)
-      if (slugParam) {
-        const resILike = await sb
-          .from("articles")
-          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-          .ilike("title", `%${slugParam}%`)
-          .limit(1)
-          .maybeSingle();
-        if (!resILike.error && resILike.data) return resILike;
-        return resILike; // return last error if any
-      }
-
-      return { data: null, error: { message: "Could not locate article." } };
-    }
+    const slug = params.get("slug");
 
     async function run(){
-      if(!slugParam && !idParam){
+      if(!slug){
         document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "Missing ?slug= or ?id= in the URL.";
+        document.getElementById("body").textContent = "Missing slug.";
         return;
       }
 
-      const { data, error } = await fetchArticle();
+      // Public policy should allow only published articles
+      const { data, error } = await sb
+        .from("articles")
+        .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
+        .eq("slug", slug)
+        .single();
 
-      if (error || !data){
-        console.error("Article load error:", error);
+      if(error || !data){
         document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "Could not load this article.";
-        showErr("Article load error:\n" + JSON.stringify(error, null, 2));
+        document.getElementById("body").textContent = "This article may be a draft or does not exist.";
         return;
       }
 
@@ -365,12 +68,15 @@
       document.getElementById("title").textContent = data.title;
 
       const dt = data.published_at || data.updated_at;
-      document.getElementById("meta").textContent = "Published: " + new Date(dt).toLocaleString();
+      document.getElementById("meta").textContent =
+        "Published: " + new Date(dt).toLocaleString();
 
+      // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
         const url = pub && pub.publicUrl;
+
         if (url) {
           img.src = url;
           img.alt = data.image_alt || data.title || "";
@@ -384,12 +90,10 @@
         img.src = "";
       }
 
-      document.getElementById("body").innerHTML = (data.body || "").replace(/\n/g, "<br>");
-
-      await initReactions();
-      await loadComments();
+      // If you want plain text only, swap innerHTML -> textContent.
+      document.getElementById("body").innerHTML =
+        (data.body || "").replace(/\n/g, "<br>");
     }
-
     run();
   </script>
 </body>
