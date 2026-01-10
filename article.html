@@ -58,7 +58,18 @@
     <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
 
     <div class="body" id="body"></div>
-
+<!-- Like / Dislike -->
+<section id="reactions" style="margin:18px 0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <button id="likeBtn" style="border:1px solid #e5e5e5;background:#fff;padding:8px 10px;border-radius:999px;cursor:pointer;">
+      👍 Like <span id="likeCount" style="color:#555;font-size:13px;">0</span>
+    </button>
+    <button id="dislikeBtn" style="border:1px solid #e5e5e5;background:#fff;padding:8px 10px;border-radius:999px;cursor:pointer;">
+      👎 Dislike <span id="dislikeCount" style="color:#555;font-size:13px;">0</span>
+    </button>
+    <span id="reactStatus" style="color:#555;font-size:13px;"></span>
+  </div>
+</section>
     <div class="rule"></div>
 
     <!-- Like / Dislike / Comments -->
@@ -91,6 +102,110 @@
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      // ---------- Like / Dislike via REST (guarantees apikey header) ----------
+const likeBtn = document.getElementById("likeBtn");
+const dislikeBtn = document.getElementById("dislikeBtn");
+const likeCount = document.getElementById("likeCount");
+const dislikeCount = document.getElementById("dislikeCount");
+const reactStatus = document.getElementById("reactStatus");
+
+function supaHeaders(){
+  return {
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+  };
+}
+
+// We will store stats by "slug" since your URL is ?slug=...
+async function statsEnsure(slug){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/article_stats`, {
+    method: "POST",
+    headers: supaHeaders(),
+    body: JSON.stringify({ slug })
+  });
+
+  // If row already exists, this POST may fail with duplicate key — that's fine.
+  if (!res.ok) {
+    const t = await res.text();
+    // If it’s a duplicate key error, ignore; otherwise show it.
+    if (!t.toLowerCase().includes("duplicate") && !t.toLowerCase().includes("already exists")) {
+      console.error("statsEnsure error:", t);
+    }
+  }
+}
+
+async function statsLoad(slug){
+  const url = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
+  const res = await fetch(url, { headers: supaHeaders() });
+
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("statsLoad error:", t);
+    likeCount.textContent = "0";
+    dislikeCount.textContent = "0";
+    return;
+  }
+
+  const rows = await res.json();
+  const row = rows?.[0] || { likes: 0, dislikes: 0 };
+  likeCount.textContent = String(row.likes ?? 0);
+  dislikeCount.textContent = String(row.dislikes ?? 0);
+}
+
+async function statsBump(slug, field){
+  reactStatus.textContent = "Saving…";
+  likeBtn.disabled = true;
+  dislikeBtn.disabled = true;
+
+  try{
+    // read current
+    const getUrl = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
+    const getRes = await fetch(getUrl, { headers: supaHeaders() });
+    if (!getRes.ok) throw new Error(await getRes.text());
+
+    const rows = await getRes.json();
+    const cur = rows?.[0] || { likes: 0, dislikes: 0 };
+
+    const next = {
+      likes: (cur.likes ?? 0) + (field === "likes" ? 1 : 0),
+      dislikes: (cur.dislikes ?? 0) + (field === "dislikes" ? 1 : 0),
+      updated_at: new Date().toISOString()
+    };
+
+    const patchUrl = `${SUPABASE_URL}/rest/v1/article_stats?slug=eq.${encodeURIComponent(slug)}`;
+    const patchRes = await fetch(patchUrl, {
+      method: "PATCH",
+      headers: supaHeaders(),
+      body: JSON.stringify(next)
+    });
+
+    if (!patchRes.ok) throw new Error(await patchRes.text());
+
+    await statsLoad(slug);
+    reactStatus.textContent = "Saved.";
+  } catch (e){
+    console.error("statsBump error:", e);
+    reactStatus.textContent = "Couldn’t save.";
+  } finally {
+    likeBtn.disabled = false;
+    dislikeBtn.disabled = false;
+    setTimeout(() => (reactStatus.textContent = ""), 1200);
+  }
+}
+
+async function initReactions(){
+  const params = new URLSearchParams(location.search);
+  const slug = params.get("slug");
+  if (!slug) return;
+
+  await statsEnsure(slug);
+  await statsLoad(slug);
+
+  likeBtn.addEventListener("click", () => statsBump(slug, "likes"));
+  dislikeBtn.addEventListener("click", () => statsBump(slug, "dislikes"));
+}
   global: {
     headers: {
       apikey: SUPABASE_ANON_KEY
@@ -415,7 +530,7 @@
       await loadComments();
     }
 
-    run();
+run().then(initReactions);
   </script>
 </body>
 </html>
