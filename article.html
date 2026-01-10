@@ -15,19 +15,19 @@
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
     /* === Article Engagement === */
-.engagement{border-top:1px solid #e5e5e5;margin-top:28px;padding-top:18px}
-.reactions{display:flex;gap:10px;align-items:center;margin-bottom:14px}
-.react-btn{border:1px solid #e5e5e5;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
-.react-btn:active{transform:translateY(1px)}
-.comment-title{margin:0 0 10px 0}
-.comment-form{display:grid;gap:10px;max-width:620px}
-.comment-form input,.comment-form textarea{border:1px solid #e5e5e5;border-radius:10px;padding:10px 12px;font:inherit}
-.comment-submit{border:1px solid #111;background:#111;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer;width:max-content}
-.comment-msg{margin:0;color:#555;font-size:13px}
-.comment-list{margin-top:14px;display:grid;gap:12px;max-width:720px}
-.comment{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
-.comment .meta{font-size:13px;color:#555;margin-bottom:6px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-.comment .text{white-space:pre-wrap}
+    .engagement{border-top:1px solid #e5e5e5;margin-top:28px;padding-top:18px}
+    .reactions{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+    .react-btn{border:1px solid #e5e5e5;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
+    .react-btn:active{transform:translateY(1px)}
+    .comment-title{margin:0 0 10px 0}
+    .comment-form{display:grid;gap:10px;max-width:620px}
+    .comment-form input,.comment-form textarea{border:1px solid #e5e5e5;border-radius:10px;padding:10px 12px;font:inherit}
+    .comment-submit{border:1px solid #111;background:#111;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer;width:max-content}
+    .comment-msg{margin:0;color:#555;font-size:13px}
+    .comment-list{margin-top:14px;display:grid;gap:12px;max-width:720px}
+    .comment{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
+    .comment .meta{font-size:13px;color:#555;margin-bottom:6px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .comment .text{white-space:pre-wrap}
   </style>
 </head>
 <body>
@@ -43,110 +43,58 @@
 
     <div class="body" id="body"></div>
 
+    <!-- Reactions + Comments (MOVED INSIDE .wrap) -->
+    <section class="engagement" id="engagement">
+      <div class="reactions">
+        <button id="btnLike" type="button" class="react-btn">
+          👍 <span id="likeCount">0</span>
+        </button>
+
+        <button id="btnDislike" type="button" class="react-btn">
+          👎 <span id="dislikeCount">0</span>
+        </button>
+      </div>
+
+      <div class="comment-box">
+        <h3 class="comment-title">Comments</h3>
+
+        <form id="commentForm" class="comment-form">
+          <input id="commentName" type="text" maxlength="50" placeholder="Name (optional)" />
+          <textarea id="commentText" rows="3" maxlength="500" placeholder="Write a comment..." required></textarea>
+          <button type="submit" class="comment-submit">Post comment</button>
+          <p id="commentMsg" class="comment-msg"></p>
+        </form>
+
+        <div id="commentList" class="comment-list"></div>
+      </div>
+    </section>
+
     <div class="rule"></div>
     <div class="muted">© <span id="y"></span> The Generous J Press</div>
   </div>
-<!-- Reactions + Comments -->
-<section class="engagement" id="engagement">
-  <div class="reactions">
-    <button id="btnLike" type="button" class="react-btn">
-      👍 <span id="likeCount">0</span>
-    </button>
 
-    <button id="btnDislike" type="button" class="react-btn">
-      👎 <span id="dislikeCount">0</span>
-    </button>
-  </div>
-
-  <div class="comment-box">
-    <h3 class="comment-title">Comments</h3>
-
-    <form id="commentForm" class="comment-form">
-      <input id="commentName" type="text" maxlength="50" placeholder="Name (optional)" />
-      <textarea id="commentText" rows="3" maxlength="500" placeholder="Write a comment..." required></textarea>
-      <button type="submit" class="comment-submit">Post comment</button>
-      <p id="commentMsg" class="comment-msg"></p>
-    </form>
-
-    <div id="commentList" class="comment-list"></div>
-  </div>
-</section>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    document.getElementById("y").textContent = String(new Date().getFullYear());
-
-    const params = new URLSearchParams(location.search);
-    const slug = params.get("slug");
-
-    async function run(){
-      if(!slug){
-        document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "Missing slug.";
-        return;
-      }
-
-      // Public policy should allow only published articles
-      const { data, error } = await sb
-        .from("articles")
-        .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
-        .eq("slug", slug)
-        .single();
-
-      if(error || !data){
-        document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "This article may be a draft or does not exist.";
-        return;
-      }
-
-      document.title = data.title + " — The Generous J Press";
-      document.getElementById("title").textContent = data.title;
-
-      const dt = data.published_at || data.updated_at;
-      document.getElementById("meta").textContent =
-        "Published: " + new Date(dt).toLocaleString();
-
-      // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
-      const img = document.getElementById("featuredImage");
-      if (data.image_path) {
-        const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
-        const url = pub && pub.publicUrl;
-
-        if (url) {
-          img.src = url;
-          img.alt = data.image_alt || data.title || "";
-          img.style.display = "block";
-        } else {
-          img.style.display = "none";
-          img.src = "";
-        }
-      } else {
-        img.style.display = "none";
-        img.src = "";
-      }
-
-      // If you want plain text only, swap innerHTML -> textContent.
-      document.getElementById("body").innerHTML =
-        (data.body || "").replace(/\n/g, "<br>");
-    }
-    run();
-  </script>
-</body>
   <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+const SUPABASE_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  global: {
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`
+    }
+  }
+});
 
-// Stable article ID
-const articleId =
-  new URLSearchParams(location.search).get("id") ||
-  (location.pathname + location.search);
+document.getElementById("y").textContent = String(new Date().getFullYear());
+
+const params = new URLSearchParams(location.search);
+const slug = params.get("slug");
+
+// Article ID (use slug if present so reactions/comments attach to the article)
+const articleId = slug || (location.pathname + location.search);
 
 // Elements
 const likeCountEl = document.getElementById("likeCount");
@@ -160,31 +108,62 @@ const commentText = document.getElementById("commentText");
 const commentMsg = document.getElementById("commentMsg");
 const commentList = document.getElementById("commentList");
 
-// Admin state
-let isAdmin = false;
-
-// HTML escape
+// Escape HTML
 function esc(s){
   return (s||"").replace(/[&<>"']/g,c=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
 
-// Check if current logged-in user is an admin
-async function refreshAdminStatus(){
-  isAdmin = false;
+async function run(){
+  if(!slug){
+    document.getElementById("title").textContent = "Article not found";
+    document.getElementById("body").textContent = "Missing slug.";
+    return;
+  }
 
-  const { data: authData } = await supabase.auth.getUser();
-  const user = authData?.user;
-  if(!user) return;
-
+  // Public policy should allow only published articles
   const { data, error } = await supabase
-    .from("site_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .from("articles")
+    .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
+    .eq("slug", slug)
+    .single();
 
-  if(!error && data?.user_id) isAdmin = true;
+  if(error || !data){
+    document.getElementById("title").textContent = "Article not found";
+    document.getElementById("body").textContent = "This article may be a draft or does not exist.";
+    return;
+  }
+
+  document.title = data.title + " — The Generous J Press";
+  document.getElementById("title").textContent = data.title;
+
+  const dt = data.published_at || data.updated_at;
+  document.getElementById("meta").textContent =
+    "Published: " + new Date(dt).toLocaleString();
+
+  // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
+  const img = document.getElementById("featuredImage");
+  if (data.image_path) {
+    const { data: pub } = supabase.storage.from("article-images").getPublicUrl(data.image_path);
+    const url = pub && pub.publicUrl;
+
+    if (url) {
+      img.src = url;
+      img.alt = data.image_alt || data.title || "";
+      img.style.display = "block";
+    } else {
+      img.style.display = "none";
+      img.src = "";
+    }
+  } else {
+    img.style.display = "none";
+    img.src = "";
+  }
+
+  // If you want plain text only, swap innerHTML -> textContent.
+  document.getElementById("body").innerHTML =
+    (data.body || "").replace(/\n/g, "<br>");
 }
 
 // Load reactions
@@ -195,128 +174,79 @@ async function loadReactions(){
     .eq("article_id", articleId)
     .maybeSingle();
 
-  if(error){
-    console.error("loadReactions:", error);
-    return;
-  }
+  console.log("loadReactions:", {data, error});
 
   likeCountEl.textContent = data?.likes ?? 0;
   dislikeCountEl.textContent = data?.dislikes ?? 0;
 }
 
-// Atomic react
+// React
 async function react(kind){
-  const { data, error } = await supabase.rpc("react", { article: articleId, kind });
-  console.log("react result:", { data, error });
-  if(error) return;
+  const { data, error } = await supabase.rpc("react", {
+    article: articleId,
+    kind
+  });
 
-  likeCountEl.textContent = data.likes;
-  dislikeCountEl.textContent = data.dislikes;
-}
+  console.log("react:", {data, error});
 
-btnLike.addEventListener("click", ()=>react("like"));
-btnDislike.addEventListener("click", ()=>react("dislike"));
-
-// Delete comment (admin only)
-async function deleteComment(id){
-  if(!confirm("Delete this comment?")) return;
-
-  const { error } = await supabase
-    .from("article_comments")
-    .delete()
-    .eq("id", id);
-
-  if(error){
-    console.error("deleteComment:", error);
-    alert("Could not delete (are you logged in as admin?)");
-    return;
-  }
-
-  loadComments();
-}
-
-// Render comments (shows delete buttons if admin)
-function renderComments(rows){
-  commentList.innerHTML = rows.map(c=>{
-    const meta = `${esc(c.name || "Anonymous")} • ${new Date(c.created_at).toLocaleString()}`;
-
-    const delBtn = isAdmin
-      ? `<button class="comment-del" data-id="${c.id}" type="button">Delete</button>`
-      : "";
-
-    return `
-      <div class="comment">
-        <div class="meta">
-          <span>${meta}</span>
-          ${delBtn}
-        </div>
-        <div class="text">${esc(c.body)}</div>
-      </div>
-    `;
-  }).join("");
-
-  // Wire up delete buttons
-  if(isAdmin){
-    commentList.querySelectorAll(".comment-del").forEach(btn=>{
-      btn.addEventListener("click", ()=>deleteComment(btn.dataset.id));
-    });
+  if(!error && data){
+    likeCountEl.textContent = data.likes;
+    dislikeCountEl.textContent = data.dislikes;
   }
 }
+
+btnLike.onclick = ()=>react("like");
+btnDislike.onclick = ()=>react("dislike");
 
 // Load comments
 async function loadComments(){
   const { data, error } = await supabase
     .from("article_comments")
-    .select("id, name, body, created_at")
+    .select("name, body, created_at")
     .eq("article_id", articleId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+    .order("created_at", {ascending:false});
 
-  if(error){
-    console.error("loadComments:", error);
-    return;
-  }
+  console.log("loadComments:", {data, error});
 
-  renderComments(data || []);
+  commentList.innerHTML = (data||[]).map(c=>`
+    <div class="comment">
+      <div class="meta">${esc(c.name||"Anonymous")} • ${new Date(c.created_at).toLocaleString()}</div>
+      <div class="text">${esc(c.body)}</div>
+    </div>
+  `).join("");
 }
 
 // Post comment
 commentForm.addEventListener("submit", async e=>{
   e.preventDefault();
-  commentMsg.textContent = "";
+  commentMsg.textContent="";
 
   const body = commentText.value.trim();
   if(!body){
-    commentMsg.textContent = "Write a comment first.";
+    commentMsg.textContent="Write a comment first.";
     return;
   }
 
   const { error } = await supabase
     .from("article_comments")
-    .insert([{
-      article_id: articleId,
-      name: commentName.value.trim() || null,
-      body: body.slice(0, 500)
-    }]);
+    .insert([{ article_id: articleId, name: commentName.value.trim()||null, body }]);
 
-  console.log("comment insert:", { error });
+  console.log("insert:", error);
 
   if(error){
-    commentMsg.textContent = "Could not post.";
+    commentMsg.textContent="Post failed.";
     return;
   }
 
-  commentText.value = "";
-  commentMsg.textContent = "Posted!";
+  commentText.value="";
+  commentMsg.textContent="Posted!";
   loadComments();
 });
 
 // Init
-(async function init(){
-  await refreshAdminStatus();
-  await loadReactions();
-  await loadComments();
-})();
-</script>
-</script>
+run();
+loadReactions();
+loadComments();
+  </script>
+</body>
 </html>
