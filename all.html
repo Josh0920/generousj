@@ -101,12 +101,15 @@
     async function loadAll(){
       const host = document.getElementById("all-stories");
 
-      const { data, error } = await sb
-        .from("articles")
-        .select("title, slug, excerpt, published_at, updated_at")
-        .eq("status", "published")
-        .order("published_at", { ascending: false });
-
+     const { data, error } = await sb
+  .from("articles")
+  .select("title, slug, excerpt, published_at, updated_at")
+  .eq("status", "published");
+data.sort((a, b) => {
+  const ad = new Date(a.published_at || a.updated_at).getTime();
+  const bd = new Date(b.published_at || b.updated_at).getTime();
+  return bd - ad;
+});
       if(error){
         host.textContent = "Error loading articles.";
         return;
