@@ -43,7 +43,7 @@
 
     <div class="body" id="body"></div>
 
-    <!-- Reactions + Comments (MOVED INSIDE .wrap) -->
+    <!-- Reactions + Comments (INSIDE .wrap) -->
     <section class="engagement" id="engagement">
       <div class="reactions">
         <button id="btnLike" type="button" class="react-btn">
@@ -79,7 +79,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
 const SUPABASE_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   global: {
     headers: {
       apikey: SUPABASE_KEY,
@@ -91,10 +91,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 document.getElementById("y").textContent = String(new Date().getFullYear());
 
 const params = new URLSearchParams(location.search);
-const slug = params.get("slug");
+const slug = params.get("slug"); // your links use ?slug=...
 
-// Article ID (use slug if present so reactions/comments attach to the article)
-const articleId = slug || (location.pathname + location.search);
+// Engagement key (stable per article)
+const articleKey = slug || (location.pathname + location.search);
 
 // Elements
 const likeCountEl = document.getElementById("likeCount");
@@ -115,6 +115,7 @@ function esc(s){
   }[c]));
 }
 
+// Load article
 async function run(){
   if(!slug){
     document.getElementById("title").textContent = "Article not found";
@@ -122,14 +123,14 @@ async function run(){
     return;
   }
 
-  // Public policy should allow only published articles
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("articles")
     .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
     .eq("slug", slug)
     .single();
 
   if(error || !data){
+    console.log("article load error:", error);
     document.getElementById("title").textContent = "Article not found";
     document.getElementById("body").textContent = "This article may be a draft or does not exist.";
     return;
@@ -139,13 +140,12 @@ async function run(){
   document.getElementById("title").textContent = data.title;
 
   const dt = data.published_at || data.updated_at;
-  document.getElementById("meta").textContent =
-    "Published: " + new Date(dt).toLocaleString();
+  document.getElementById("meta").textContent = "Published: " + new Date(dt).toLocaleString();
 
-  // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
+  // Featured image
   const img = document.getElementById("featuredImage");
   if (data.image_path) {
-    const { data: pub } = supabase.storage.from("article-images").getPublicUrl(data.image_path);
+    const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
     const url = pub && pub.publicUrl;
 
     if (url) {
@@ -161,20 +161,20 @@ async function run(){
     img.src = "";
   }
 
-  // If you want plain text only, swap innerHTML -> textContent.
-  document.getElementById("body").innerHTML =
-    (data.body || "").replace(/\n/g, "<br>");
+  document.getElementById("body").innerHTML = (data.body || "").replace(/\n/g, "<br>");
 }
 
 // Load reactions
 async function loadReactions(){
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("article_reactions")
     .select("likes, dislikes")
-    .eq("article_id", articleId)
+    .eq("article_id", articleKey)
     .maybeSingle();
 
   console.log("loadReactions:", {data, error});
+
+  if(error) return;
 
   likeCountEl.textContent = data?.likes ?? 0;
   dislikeCountEl.textContent = data?.dislikes ?? 0;
@@ -182,17 +182,17 @@ async function loadReactions(){
 
 // React
 async function react(kind){
-  const { data, error } = await supabase.rpc("react", {
-    article: articleId,
+  const { data, error } = await sb.rpc("react", {
+    article: articleKey,
     kind
   });
 
   console.log("react:", {data, error});
 
-  if(!error && data){
-    likeCountEl.textContent = data.likes;
-    dislikeCountEl.textContent = data.dislikes;
-  }
+  if(error || !data) return;
+
+  likeCountEl.textContent = data.likes ?? 0;
+  dislikeCountEl.textContent = data.dislikes ?? 0;
 }
 
 btnLike.onclick = ()=>react("like");
@@ -200,13 +200,16 @@ btnDislike.onclick = ()=>react("dislike");
 
 // Load comments
 async function loadComments(){
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("article_comments")
     .select("name, body, created_at")
-    .eq("article_id", articleId)
-    .order("created_at", {ascending:false});
+    .eq("article_id", articleKey)
+    .order("created_at", {ascending:false})
+    .limit(50);
 
   console.log("loadComments:", {data, error});
+
+  if(error) return;
 
   commentList.innerHTML = (data||[]).map(c=>`
     <div class="comment">
@@ -219,27 +222,27 @@ async function loadComments(){
 // Post comment
 commentForm.addEventListener("submit", async e=>{
   e.preventDefault();
-  commentMsg.textContent="";
+  commentMsg.textContent = "";
 
   const body = commentText.value.trim();
   if(!body){
-    commentMsg.textContent="Write a comment first.";
+    commentMsg.textContent = "Write a comment first.";
     return;
   }
 
-  const { error } = await supabase
+  const { error } = await sb
     .from("article_comments")
-    .insert([{ article_id: articleId, name: commentName.value.trim()||null, body }]);
+    .insert([{ article_id: articleKey, name: commentName.value.trim()||null, body }]);
 
-  console.log("insert:", error);
+  console.log("insert:", { error });
 
   if(error){
-    commentMsg.textContent="Post failed.";
+    commentMsg.textContent = error.message || "Post failed.";
     return;
   }
 
-  commentText.value="";
-  commentMsg.textContent="Posted!";
+  commentText.value = "";
+  commentMsg.textContent = "Posted!";
   loadComments();
 });
 
