@@ -14,6 +14,36 @@
     .muted{color:#555;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px}
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
+
+    /* --- Engagement (comments only) --- */
+    .engage{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .engage h3{margin:0 0 10px;font-size:14px;color:#111}
+    .btn{
+      appearance:none;border:1px solid #e5e5e5;background:#fff;color:#111;
+      padding:8px 10px;border-radius:999px;cursor:pointer;font-size:14px;
+    }
+    .btn:hover{background:#f7f7f7}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .count{color:#555;font-size:13px}
+    .commentForm{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+    .commentForm input,.commentForm textarea{
+      width:100%;border:1px solid #e5e5e5;border-radius:10px;padding:10px;font:inherit
+    }
+    .commentForm .row{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
+    @media (min-width:620px){ .commentForm .row{grid-template-columns:220px 1fr} }
+    .commentForm textarea{min-height:90px;resize:vertical}
+    .commentList{margin:10px 0 0;padding:0;list-style:none}
+    .comment{
+      border:1px solid #e5e5e5;border-radius:14px;padding:12px;margin:10px 0
+    }
+    .commentTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .commentMeta{color:#555;font-size:12px}
+    .commentBody{margin:8px 0 0;font-size:14px;line-height:1.5}
+    .smallBtn{
+      border:1px solid #e5e5e5;background:#fff;border-radius:10px;
+      padding:6px 8px;cursor:pointer;font-size:12px
+    }
+    .smallBtn:hover{background:#f7f7f7}
   </style>
 </head>
 <body>
@@ -24,12 +54,28 @@
       <div class="muted" id="meta"></div>
     </header>
 
-    <!-- (ADDED) Featured image placeholder -->
     <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
 
     <div class="body" id="body"></div>
 
     <div class="rule"></div>
+
+    <!-- Comments only -->
+    <section class="engage" id="engagement" style="margin:18px 0;">
+      <h3>Comments</h3>
+
+      <form class="commentForm" id="commentForm">
+        <div class="row">
+          <input id="commentName" maxlength="40" placeholder="Name (optional)" />
+          <input id="commentBody" maxlength="500" placeholder="Write a comment…" required />
+        </div>
+        <button class="btn" type="submit">Post Comment</button>
+        <span class="count" id="commentStatus"></span>
+      </form>
+
+      <ul class="commentList" id="commentList"></ul>
+    </section>
+
     <div class="muted">© <span id="y"></span> The Generous J Press</div>
   </div>
 
@@ -42,27 +88,184 @@
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
     const params = new URLSearchParams(location.search);
-    const slug = params.get("slug");
+    const slugParam = params.get("slug"); // keep your existing links working
+
+    // IMPORTANT: declare early so nothing can reference it before init
+    let ARTICLE_ID = null;
+
+    const commentForm = document.getElementById("commentForm");
+    const commentName = document.getElementById("commentName");
+    const commentBody = document.getElementById("commentBody");
+    const commentStatus = document.getElementById("commentStatus");
+    const commentList = document.getElementById("commentList");
+
+    function escapeHtml(s){
+      return (s || "").replace(/[&<>"']/g, (c) => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+    function keyFor(){
+      // Prefer article_id if we have it; otherwise fallback to slug string
+      if (ARTICLE_ID) return { mode: "article_id", value: ARTICLE_ID };
+      return { mode: "slug", value: slugParam || "" };
+    }
+
+    async function isSignedIn(){
+      const { data } = await sb.auth.getUser();
+      return Boolean(data?.user);
+    }
+
+    function renderComment(c, showDelete){
+      const li = document.createElement("li");
+      li.className = "comment";
+      li.innerHTML = `
+        <div class="commentTop">
+          <div>
+            <div><strong>${escapeHtml(c.name || "Anonymous")}</strong></div>
+            <div class="commentMeta">${new Date(c.created_at).toLocaleString()}</div>
+          </div>
+          ${showDelete ? `<button class="smallBtn" data-del="${c.id}">Delete</button>` : ""}
+        </div>
+        <div class="commentBody">${escapeHtml(c.body)}</div>
+      `;
+      return li;
+    }
+
+    async function loadComments(){
+      commentList.innerHTML = "";
+
+      const showDelete = await isSignedIn();
+      const k = keyFor();
+
+      let q = sb.from("article_comments").select("id, name, body, created_at");
+
+      // try article_id schema first if possible, else slug schema
+      if (k.mode === "article_id") {
+        q = q.eq("article_id", k.value);
+      } else {
+        q = q.eq("slug", k.value);
+      }
+
+      q = q.order("created_at", { ascending: false });
+
+      const { data, error } = await q;
+
+      if (error) {
+        console.error("loadComments error:", error);
+        commentList.innerHTML = `<li class="muted">Could not load comments.</li>`;
+        return;
+      }
+
+      if (!data || data.length === 0){
+        commentList.innerHTML = `<li class="muted">No comments yet.</li>`;
+        return;
+      }
+
+      data.forEach(c => commentList.appendChild(renderComment(c, showDelete)));
+    }
+
+    commentList.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-del]");
+      if (!btn) return;
+
+      const id = btn.getAttribute("data-del");
+      if (!id) return;
+
+      if (!confirm("Delete this comment?")) return;
+
+      commentStatus.textContent = "Deleting…";
+      const { error } = await sb.from("article_comments").delete().eq("id", id);
+
+      if (error){
+        console.error("delete error:", error);
+        commentStatus.textContent = "Delete failed (must be signed in as admin).";
+        return;
+      }
+
+      commentStatus.textContent = "Deleted.";
+      await loadComments();
+      await sleep(900);
+      commentStatus.textContent = "";
+    });
+
+    commentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = (commentName.value || "").trim() || "Anonymous";
+      const body = (commentBody.value || "").trim();
+      if (!body){
+        commentStatus.textContent = "Write something first.";
+        return;
+      }
+
+      commentStatus.textContent = "Posting…";
+
+      const k = keyFor();
+      let payload;
+
+      if (k.mode === "article_id") payload = { article_id: k.value, name, body };
+      else payload = { slug: k.value, name, body };
+
+      const { error } = await sb.from("article_comments").insert(payload);
+
+      if (error){
+        console.error("comment insert error:", error);
+        commentStatus.textContent = "Post failed.";
+        return;
+      }
+
+      commentBody.value = "";
+      commentStatus.textContent = "Posted.";
+      await loadComments();
+      await sleep(900);
+      commentStatus.textContent = "";
+    });
+
+    // ---------- Article loader (works if articles uses slug OR title) ----------
+    async function loadArticleBySlugOrTitle(slugText){
+      // 1) Try articles.slug
+      let res = await sb
+        .from("articles")
+        .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+        .eq("slug", slugText)
+        .single();
+
+      // If slug column doesn't exist (or no row), try title fallback
+      if (res.error) {
+        const msg = (res.error.message || "").toLowerCase();
+        if (msg.includes('column') && msg.includes('slug')) {
+          res = await sb
+            .from("articles")
+            .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+            .eq("title", slugText)
+            .single();
+        }
+      }
+
+      return res;
+    }
 
     async function run(){
-      if(!slug){
+      if(!slugParam){
         document.getElementById("title").textContent = "Article not found";
         document.getElementById("body").textContent = "Missing slug.";
         return;
       }
 
-      // Public policy should allow only published articles
-      const { data, error } = await sb
-        .from("articles")
-        .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
-        .eq("slug", slug)
-        .single();
+      const { data, error } = await loadArticleBySlugOrTitle(slugParam);
 
       if(error || !data){
+        console.error("Article load error:", error);
         document.getElementById("title").textContent = "Article not found";
         document.getElementById("body").textContent = "This article may be a draft or does not exist.";
         return;
       }
+
+      // ✅ Set ARTICLE_ID only AFTER successful load
+      ARTICLE_ID = data.id || null;
 
       document.title = data.title + " — The Generous J Press";
       document.getElementById("title").textContent = data.title;
@@ -71,7 +274,7 @@
       document.getElementById("meta").textContent =
         "Published: " + new Date(dt).toLocaleString();
 
-      // ✅ FIXED: Render featured image using Supabase Storage public URL from image_path
+      // featured image
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
@@ -90,10 +293,12 @@
         img.src = "";
       }
 
-      // If you want plain text only, swap innerHTML -> textContent.
       document.getElementById("body").innerHTML =
         (data.body || "").replace(/\n/g, "<br>");
+
+      await loadComments();
     }
+
     run();
   </script>
 </body>
