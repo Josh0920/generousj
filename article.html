@@ -94,9 +94,11 @@
 
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
-    // ✅ We now use ?id=<uuid>
     const params = new URLSearchParams(location.search);
-    const articleId = params.get("id");
+    const slugParam = params.get("slug"); // keep your existing links working
+
+    // IMPORTANT: declare early so nothing can reference it before init
+    let ARTICLE_ID = null;
 
     const likeBtn = document.getElementById("likeBtn");
     const dislikeBtn = document.getElementById("dislikeBtn");
@@ -116,21 +118,51 @@
       }[c]));
     }
 
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+    function keyFor(){
+      // Prefer article_id if we have it; otherwise fallback to slug string
+      if (ARTICLE_ID) return { mode: "article_id", value: ARTICLE_ID };
+      return { mode: "slug", value: slugParam || "" };
+    }
+
+    // ---------- Schema-flex helpers (works with either table design) ----------
+    async function tryStatsUpsertWithArticleId(){
+      const { error } = await sb.from("article_stats").upsert({ article_id: ARTICLE_ID });
+      if (error) throw error;
+      return true;
+    }
+    async function tryStatsUpsertWithSlug(){
+      const { error } = await sb.from("article_stats").upsert({ slug: slugParam });
+      if (error) throw error;
+      return true;
+    }
+
     async function ensureStatsRow(){
-      // article_id is PRIMARY KEY, so this is safe
-      const { error } = await sb.from("article_stats").upsert({ article_id: articleId });
-      if (error) console.error("ensureStatsRow error:", error);
+      // Try article_id first if available, else slug
+      const k = keyFor();
+      if (k.mode === "article_id") {
+        try { return await tryStatsUpsertWithArticleId(); }
+        catch(e){ /* fall through */ }
+      }
+      // fallback to slug mode
+      try { return await tryStatsUpsertWithSlug(); }
+      catch(e){
+        console.error("ensureStatsRow error:", e);
+        throw e;
+      }
     }
 
     async function loadStats(){
-      const { data, error } = await sb
-        .from("article_stats")
-        .select("likes, dislikes")
-        .eq("article_id", articleId)
-        .single();
+      const k = keyFor();
+      let q = sb.from("article_stats").select("likes, dislikes");
 
-      if (error) {
-        // If row doesn’t exist yet, show zeros (ensureStatsRow should create it)
+      if (k.mode === "article_id") q = q.eq("article_id", k.value);
+      else q = q.eq("slug", k.value);
+
+      const { data, error } = await q.single();
+
+      if (error || !data) {
         likeCount.textContent = "0";
         dislikeCount.textContent = "0";
         return;
@@ -146,12 +178,13 @@
         likeBtn.disabled = true;
         dislikeBtn.disabled = true;
 
-        const { data: cur, error: curErr } = await sb
-          .from("article_stats")
-          .select("likes, dislikes")
-          .eq("article_id", articleId)
-          .single();
+        const k = keyFor();
+        let q = sb.from("article_stats").select("likes, dislikes");
 
+        if (k.mode === "article_id") q = q.eq("article_id", k.value);
+        else q = q.eq("slug", k.value);
+
+        const { data: cur, error: curErr } = await q.single();
         if (curErr) throw curErr;
 
         const next = {
@@ -160,11 +193,11 @@
           updated_at: new Date().toISOString()
         };
 
-        const { error: upErr } = await sb
-          .from("article_stats")
-          .update(next)
-          .eq("article_id", articleId);
+        let uq = sb.from("article_stats").update(next);
+        if (k.mode === "article_id") uq = uq.eq("article_id", k.value);
+        else uq = uq.eq("slug", k.value);
 
+        const { error: upErr } = await uq;
         if (upErr) throw upErr;
 
         await loadStats();
@@ -175,7 +208,8 @@
       } finally {
         likeBtn.disabled = false;
         dislikeBtn.disabled = false;
-        setTimeout(() => (reactStatus.textContent = ""), 1200);
+        await sleep(900);
+        reactStatus.textContent = "";
       }
     }
 
@@ -203,14 +237,21 @@
     async function loadComments(){
       commentList.innerHTML = "";
 
-      // We only show delete buttons if signed in (policy still controls actual delete)
       const showDelete = await isSignedIn();
+      const k = keyFor();
 
-      const { data, error } = await sb
-        .from("article_comments")
-        .select("id, name, body, created_at")
-        .eq("article_id", articleId)
-        .order("created_at", { ascending: false });
+      let q = sb.from("article_comments").select("id, name, body, created_at");
+
+      // try article_id schema first if possible, else slug schema
+      if (k.mode === "article_id") {
+        q = q.eq("article_id", k.value);
+      } else {
+        q = q.eq("slug", k.value);
+      }
+
+      q = q.order("created_at", { ascending: false });
+
+      const { data, error } = await q;
 
       if (error) {
         console.error("loadComments error:", error);
@@ -246,16 +287,15 @@
 
       commentStatus.textContent = "Deleted.";
       await loadComments();
-      setTimeout(() => (commentStatus.textContent = ""), 1200);
+      await sleep(900);
+      commentStatus.textContent = "";
     });
 
     commentForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!articleId) return;
 
       const name = (commentName.value || "").trim() || "Anonymous";
       const body = (commentBody.value || "").trim();
-
       if (!body){
         commentStatus.textContent = "Write something first.";
         return;
@@ -263,11 +303,13 @@
 
       commentStatus.textContent = "Posting…";
 
-      const { error } = await sb.from("article_comments").insert({
-        article_id: articleId,
-        name,
-        body
-      });
+      const k = keyFor();
+      let payload;
+
+      if (k.mode === "article_id") payload = { article_id: k.value, name, body };
+      else payload = { slug: k.value, name, body };
+
+      const { error } = await sb.from("article_comments").insert(payload);
 
       if (error){
         console.error("comment insert error:", error);
@@ -278,44 +320,69 @@
       commentBody.value = "";
       commentStatus.textContent = "Posted.";
       await loadComments();
-      setTimeout(() => (commentStatus.textContent = ""), 1200);
+      await sleep(900);
+      commentStatus.textContent = "";
     });
 
     likeBtn.addEventListener("click", () => bump("likes"));
     dislikeBtn.addEventListener("click", () => bump("dislikes"));
 
+    // ---------- Article loader (works if articles uses slug OR title) ----------
+    async function loadArticleBySlugOrTitle(slugText){
+      // 1) Try articles.slug
+      let res = await sb
+        .from("articles")
+        .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+        .eq("slug", slugText)
+        .single();
+
+      // If slug column doesn't exist (or no row), try title fallback
+      if (res.error) {
+        const msg = (res.error.message || "").toLowerCase();
+        if (msg.includes('column') && msg.includes('slug')) {
+          res = await sb
+            .from("articles")
+            .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+            .eq("title", slugText)
+            .single();
+        }
+      }
+
+      return res;
+    }
+
     async function run(){
-      if(!articleId){
+      if(!slugParam){
         document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "Missing ?id= in the URL.";
+        document.getElementById("body").textContent = "Missing slug.";
         return;
       }
 
-      // ✅ Load article by ID
-      const { data, error } = await sb
-        .from("articles")
-        .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-        .eq("id", articleId)
-        .single();
+      const { data, error } = await loadArticleBySlugOrTitle(slugParam);
 
       if(error || !data){
-        console.error("article load error:", error);
+        console.error("Article load error:", error);
         document.getElementById("title").textContent = "Article not found";
         document.getElementById("body").textContent = "This article may be a draft or does not exist.";
         return;
       }
 
+      // ✅ Set ARTICLE_ID only AFTER successful load
+      ARTICLE_ID = data.id || null;
+
       document.title = data.title + " — The Generous J Press";
       document.getElementById("title").textContent = data.title;
 
       const dt = data.published_at || data.updated_at;
-      document.getElementById("meta").textContent = "Published: " + new Date(dt).toLocaleString();
+      document.getElementById("meta").textContent =
+        "Published: " + new Date(dt).toLocaleString();
 
       // featured image
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
         const url = pub && pub.publicUrl;
+
         if (url) {
           img.src = url;
           img.alt = data.image_alt || data.title || "";
@@ -329,10 +396,15 @@
         img.src = "";
       }
 
-      document.getElementById("body").innerHTML = (data.body || "").replace(/\n/g, "<br>");
+      document.getElementById("body").innerHTML =
+        (data.body || "").replace(/\n/g, "<br>");
 
-      // Engagement boot
-      await ensureStatsRow();
+      // ✅ Engagement only boots AFTER ARTICLE_ID is initialized
+      try{
+        await ensureStatsRow();
+      } catch(e){
+        console.error("Engagement init failed:", e);
+      }
       await loadStats();
       await loadComments();
     }
