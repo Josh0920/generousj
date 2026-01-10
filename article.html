@@ -58,18 +58,7 @@
     <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
 
     <div class="body" id="body"></div>
-<!-- Like / Dislike -->
-<section id="reactions" style="margin:18px 0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
-  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <button id="likeBtn" style="border:1px solid #e5e5e5;background:#fff;padding:8px 10px;border-radius:999px;cursor:pointer;">
-      👍 Like <span id="likeCount" style="color:#555;font-size:13px;">0</span>
-    </button>
-    <button id="dislikeBtn" style="border:1px solid #e5e5e5;background:#fff;padding:8px 10px;border-radius:999px;cursor:pointer;">
-      👎 Dislike <span id="dislikeCount" style="color:#555;font-size:13px;">0</span>
-    </button>
-    <span id="reactStatus" style="color:#555;font-size:13px;"></span>
-  </div>
-</section>
+
     <div class="rule"></div>
 
     <!-- Like / Dislike / Comments -->
@@ -101,126 +90,16 @@
   <script>
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      // ---------- Like / Dislike via REST (guarantees apikey header) ----------
-const likeBtn = document.getElementById("likeBtn");
-const dislikeBtn = document.getElementById("dislikeBtn");
-const likeCount = document.getElementById("likeCount");
-const dislikeCount = document.getElementById("dislikeCount");
-const reactStatus = document.getElementById("reactStatus");
 
-function supaHeaders(){
-  return {
-    "apikey": SUPABASE_ANON_KEY,
-    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-    "Content-Type": "application/json",
-    "Prefer": "return=representation"
-  };
-}
-
-// We will store stats by "slug" since your URL is ?slug=...
-async function statsEnsure(slug){
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/article_stats`, {
-    method: "POST",
-    headers: supaHeaders(),
-    body: JSON.stringify({ slug })
-  });
-
-  // If row already exists, this POST may fail with duplicate key — that's fine.
-  if (!res.ok) {
-    const t = await res.text();
-    // If it’s a duplicate key error, ignore; otherwise show it.
-    if (!t.toLowerCase().includes("duplicate") && !t.toLowerCase().includes("already exists")) {
-      console.error("statsEnsure error:", t);
-    }
-  }
-}
-
-async function statsLoad(slug){
-  const url = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
-  const res = await fetch(url, { headers: supaHeaders() });
-
-  if (!res.ok) {
-    const t = await res.text();
-    console.error("statsLoad error:", t);
-    likeCount.textContent = "0";
-    dislikeCount.textContent = "0";
-    return;
-  }
-
-  const rows = await res.json();
-  const row = rows?.[0] || { likes: 0, dislikes: 0 };
-  likeCount.textContent = String(row.likes ?? 0);
-  dislikeCount.textContent = String(row.dislikes ?? 0);
-}
-
-async function statsBump(slug, field){
-  reactStatus.textContent = "Saving…";
-  likeBtn.disabled = true;
-  dislikeBtn.disabled = true;
-
-  try{
-    // read current
-    const getUrl = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
-    const getRes = await fetch(getUrl, { headers: supaHeaders() });
-    if (!getRes.ok) throw new Error(await getRes.text());
-
-    const rows = await getRes.json();
-    const cur = rows?.[0] || { likes: 0, dislikes: 0 };
-
-    const next = {
-      likes: (cur.likes ?? 0) + (field === "likes" ? 1 : 0),
-      dislikes: (cur.dislikes ?? 0) + (field === "dislikes" ? 1 : 0),
-      updated_at: new Date().toISOString()
-    };
-
-    const patchUrl = `${SUPABASE_URL}/rest/v1/article_stats?slug=eq.${encodeURIComponent(slug)}`;
-    const patchRes = await fetch(patchUrl, {
-      method: "PATCH",
-      headers: supaHeaders(),
-      body: JSON.stringify(next)
-    });
-
-    if (!patchRes.ok) throw new Error(await patchRes.text());
-
-    await statsLoad(slug);
-    reactStatus.textContent = "Saved.";
-  } catch (e){
-    console.error("statsBump error:", e);
-    reactStatus.textContent = "Couldn’t save.";
-  } finally {
-    likeBtn.disabled = false;
-    dislikeBtn.disabled = false;
-    setTimeout(() => (reactStatus.textContent = ""), 1200);
-  }
-}
-
-async function initReactions(){
-  const params = new URLSearchParams(location.search);
-  const slug = params.get("slug");
-  if (!slug) return;
-
-  await statsEnsure(slug);
-  await statsLoad(slug);
-
-  likeBtn.addEventListener("click", () => statsBump(slug, "likes"));
-  dislikeBtn.addEventListener("click", () => statsBump(slug, "dislikes"));
-}
-  global: {
-    headers: {
-      apikey: SUPABASE_ANON_KEY
-    }
-  }
-});
+    // ✅ Clean, normal Supabase client (no junk inside options)
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
     const params = new URLSearchParams(location.search);
-    const slugParam = params.get("slug"); // keep your existing links working
+    const slugParam = params.get("slug");
 
-    // IMPORTANT: declare early so nothing can reference it before init
-    let ARTICLE_ID = null;
-
+    // UI
     const likeBtn = document.getElementById("likeBtn");
     const dislikeBtn = document.getElementById("dislikeBtn");
     const likeCount = document.getElementById("likeCount");
@@ -239,74 +118,63 @@ async function initReactions(){
       }[c]));
     }
 
-    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-    function keyFor(){
-      // Prefer article_id if we have it; otherwise fallback to slug string
-      if (ARTICLE_ID) return { mode: "article_id", value: ARTICLE_ID };
-      return { mode: "slug", value: slugParam || "" };
+    // ---------- Likes/Dislikes via REST (guarantees apikey header) ----------
+    function supaHeaders(){
+      return {
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+      };
     }
 
-    // ---------- Schema-flex helpers (works with either table design) ----------
-    async function tryStatsUpsertWithArticleId(){
-      const { error } = await sb.from("article_stats").upsert({ article_id: ARTICLE_ID });
-      if (error) throw error;
-      return true;
-    }
-    async function tryStatsUpsertWithSlug(){
-      const { error } = await sb.from("article_stats").upsert({ slug: slugParam });
-      if (error) throw error;
-      return true;
-    }
+    async function statsEnsure(slug){
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/article_stats`, {
+        method: "POST",
+        headers: supaHeaders(),
+        body: JSON.stringify({ slug })
+      });
 
-    async function ensureStatsRow(){
-      // Try article_id first if available, else slug
-      const k = keyFor();
-      if (k.mode === "article_id") {
-        try { return await tryStatsUpsertWithArticleId(); }
-        catch(e){ /* fall through */ }
-      }
-      // fallback to slug mode
-      try { return await tryStatsUpsertWithSlug(); }
-      catch(e){
-        console.error("ensureStatsRow error:", e);
-        throw e;
+      // If row exists, ignore duplicate errors
+      if (!res.ok) {
+        const t = await res.text();
+        const low = t.toLowerCase();
+        if (!low.includes("duplicate") && !low.includes("already exists")) {
+          console.error("statsEnsure error:", t);
+        }
       }
     }
 
-    async function loadStats(){
-      const k = keyFor();
-      let q = sb.from("article_stats").select("likes, dislikes");
+    async function statsLoad(slug){
+      const url = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
+      const res = await fetch(url, { headers: supaHeaders() });
 
-      if (k.mode === "article_id") q = q.eq("article_id", k.value);
-      else q = q.eq("slug", k.value);
-
-      const { data, error } = await q.single();
-
-      if (error || !data) {
+      if (!res.ok) {
+        const t = await res.text();
+        console.error("statsLoad error:", t);
         likeCount.textContent = "0";
         dislikeCount.textContent = "0";
         return;
       }
 
-      likeCount.textContent = String(data.likes ?? 0);
-      dislikeCount.textContent = String(data.dislikes ?? 0);
+      const rows = await res.json();
+      const row = rows?.[0] || { likes: 0, dislikes: 0 };
+      likeCount.textContent = String(row.likes ?? 0);
+      dislikeCount.textContent = String(row.dislikes ?? 0);
     }
 
-    async function bump(field){
+    async function statsBump(slug, field){
+      reactStatus.textContent = "Saving…";
+      likeBtn.disabled = true;
+      dislikeBtn.disabled = true;
+
       try{
-        reactStatus.textContent = "Saving…";
-        likeBtn.disabled = true;
-        dislikeBtn.disabled = true;
+        const getUrl = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
+        const getRes = await fetch(getUrl, { headers: supaHeaders() });
+        if (!getRes.ok) throw new Error(await getRes.text());
 
-        const k = keyFor();
-        let q = sb.from("article_stats").select("likes, dislikes");
-
-        if (k.mode === "article_id") q = q.eq("article_id", k.value);
-        else q = q.eq("slug", k.value);
-
-        const { data: cur, error: curErr } = await q.single();
-        if (curErr) throw curErr;
+        const rows = await getRes.json();
+        const cur = rows?.[0] || { likes: 0, dislikes: 0 };
 
         const next = {
           likes: (cur.likes ?? 0) + (field === "likes" ? 1 : 0),
@@ -314,26 +182,37 @@ async function initReactions(){
           updated_at: new Date().toISOString()
         };
 
-        let uq = sb.from("article_stats").update(next);
-        if (k.mode === "article_id") uq = uq.eq("article_id", k.value);
-        else uq = uq.eq("slug", k.value);
+        const patchUrl = `${SUPABASE_URL}/rest/v1/article_stats?slug=eq.${encodeURIComponent(slug)}`;
+        const patchRes = await fetch(patchUrl, {
+          method: "PATCH",
+          headers: supaHeaders(),
+          body: JSON.stringify(next)
+        });
 
-        const { error: upErr } = await uq;
-        if (upErr) throw upErr;
+        if (!patchRes.ok) throw new Error(await patchRes.text());
 
-        await loadStats();
+        await statsLoad(slug);
         reactStatus.textContent = "Saved.";
-      } catch(e){
-        console.error("bump error:", e);
+      } catch (e){
+        console.error("statsBump error:", e);
         reactStatus.textContent = "Couldn’t save.";
       } finally {
         likeBtn.disabled = false;
         dislikeBtn.disabled = false;
-        await sleep(900);
-        reactStatus.textContent = "";
+        setTimeout(() => (reactStatus.textContent = ""), 1200);
       }
     }
 
+    async function initReactions(){
+      if (!slugParam) return;
+      await statsEnsure(slugParam);
+      await statsLoad(slugParam);
+
+      likeBtn.addEventListener("click", () => statsBump(slugParam, "likes"));
+      dislikeBtn.addEventListener("click", () => statsBump(slugParam, "dislikes"));
+    }
+
+    // ---------- Comments (supabase-js) ----------
     async function isSignedIn(){
       const { data } = await sb.auth.getUser();
       return Boolean(data?.user);
@@ -357,22 +236,14 @@ async function initReactions(){
 
     async function loadComments(){
       commentList.innerHTML = "";
-
       const showDelete = await isSignedIn();
-      const k = keyFor();
 
-      let q = sb.from("article_comments").select("id, name, body, created_at");
-
-      // try article_id schema first if possible, else slug schema
-      if (k.mode === "article_id") {
-        q = q.eq("article_id", k.value);
-      } else {
-        q = q.eq("slug", k.value);
-      }
-
-      q = q.order("created_at", { ascending: false });
-
-      const { data, error } = await q;
+      // This assumes your comments table uses "slug" (since your comments are working)
+      const { data, error } = await sb
+        .from("article_comments")
+        .select("id, name, body, created_at")
+        .eq("slug", slugParam)
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("loadComments error:", error);
@@ -408,15 +279,16 @@ async function initReactions(){
 
       commentStatus.textContent = "Deleted.";
       await loadComments();
-      await sleep(900);
-      commentStatus.textContent = "";
+      setTimeout(() => (commentStatus.textContent = ""), 1200);
     });
 
     commentForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (!slugParam) return;
 
       const name = (commentName.value || "").trim() || "Anonymous";
       const body = (commentBody.value || "").trim();
+
       if (!body){
         commentStatus.textContent = "Write something first.";
         return;
@@ -424,13 +296,11 @@ async function initReactions(){
 
       commentStatus.textContent = "Posting…";
 
-      const k = keyFor();
-      let payload;
-
-      if (k.mode === "article_id") payload = { article_id: k.value, name, body };
-      else payload = { slug: k.value, name, body };
-
-      const { error } = await sb.from("article_comments").insert(payload);
+      const { error } = await sb.from("article_comments").insert({
+        slug: slugParam,
+        name,
+        body
+      });
 
       if (error){
         console.error("comment insert error:", error);
@@ -441,26 +311,21 @@ async function initReactions(){
       commentBody.value = "";
       commentStatus.textContent = "Posted.";
       await loadComments();
-      await sleep(900);
-      commentStatus.textContent = "";
+      setTimeout(() => (commentStatus.textContent = ""), 1200);
     });
 
-    likeBtn.addEventListener("click", () => bump("likes"));
-    dislikeBtn.addEventListener("click", () => bump("dislikes"));
-
-    // ---------- Article loader (works if articles uses slug OR title) ----------
+    // ---------- Article loader ----------
     async function loadArticleBySlugOrTitle(slugText){
-      // 1) Try articles.slug
+      // Try articles.slug first; if column doesn't exist, fallback to title
       let res = await sb
         .from("articles")
         .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
         .eq("slug", slugText)
         .single();
 
-      // If slug column doesn't exist (or no row), try title fallback
       if (res.error) {
         const msg = (res.error.message || "").toLowerCase();
-        if (msg.includes('column') && msg.includes('slug')) {
+        if (msg.includes("column") && msg.includes("slug")) {
           res = await sb
             .from("articles")
             .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
@@ -488,9 +353,6 @@ async function initReactions(){
         return;
       }
 
-      // ✅ Set ARTICLE_ID only AFTER successful load
-      ARTICLE_ID = data.id || null;
-
       document.title = data.title + " — The Generous J Press";
       document.getElementById("title").textContent = data.title;
 
@@ -498,7 +360,6 @@ async function initReactions(){
       document.getElementById("meta").textContent =
         "Published: " + new Date(dt).toLocaleString();
 
-      // featured image
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
@@ -520,17 +381,11 @@ async function initReactions(){
       document.getElementById("body").innerHTML =
         (data.body || "").replace(/\n/g, "<br>");
 
-      // ✅ Engagement only boots AFTER ARTICLE_ID is initialized
-      try{
-        await ensureStatsRow();
-      } catch(e){
-        console.error("Engagement init failed:", e);
-      }
-      await loadStats();
+      await initReactions();
       await loadComments();
     }
 
-run().then(initReactions);
+    run();
   </script>
 </body>
 </html>
