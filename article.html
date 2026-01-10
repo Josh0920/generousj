@@ -143,10 +143,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Article ID
+// Stable article ID
 const articleId =
   new URLSearchParams(location.search).get("id") ||
-  location.pathname + location.search;
+  (location.pathname + location.search);
 
 // Elements
 const likeCountEl = document.getElementById("likeCount");
@@ -159,6 +159,33 @@ const commentName = document.getElementById("commentName");
 const commentText = document.getElementById("commentText");
 const commentMsg = document.getElementById("commentMsg");
 const commentList = document.getElementById("commentList");
+
+// Admin state
+let isAdmin = false;
+
+// HTML escape
+function esc(s){
+  return (s||"").replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+// Check if current logged-in user is an admin
+async function refreshAdminStatus(){
+  isAdmin = false;
+
+  const { data: authData } = await supabase.auth.getUser();
+  const user = authData?.user;
+  if(!user) return;
+
+  const { data, error } = await supabase
+    .from("site_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if(!error && data?.user_id) isAdmin = true;
+}
 
 // Load reactions
 async function loadReactions(){
@@ -177,15 +204,10 @@ async function loadReactions(){
   dislikeCountEl.textContent = data?.dislikes ?? 0;
 }
 
-// React
+// Atomic react
 async function react(kind){
-  const { data, error } = await supabase.rpc("react", {
-    article: articleId,
-    kind
-  });
-
-  console.log("react result:", {data, error});
-
+  const { data, error } = await supabase.rpc("react", { article: articleId, kind });
+  console.log("react result:", { data, error });
   if(error) return;
 
   likeCountEl.textContent = data.likes;
@@ -195,44 +217,77 @@ async function react(kind){
 btnLike.addEventListener("click", ()=>react("like"));
 btnDislike.addEventListener("click", ()=>react("dislike"));
 
-// Escape HTML
-function esc(s){
-  return (s||"").replace(/[&<>"']/g,c=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[c]));
+// Delete comment (admin only)
+async function deleteComment(id){
+  if(!confirm("Delete this comment?")) return;
+
+  const { error } = await supabase
+    .from("article_comments")
+    .delete()
+    .eq("id", id);
+
+  if(error){
+    console.error("deleteComment:", error);
+    alert("Could not delete (are you logged in as admin?)");
+    return;
+  }
+
+  loadComments();
+}
+
+// Render comments (shows delete buttons if admin)
+function renderComments(rows){
+  commentList.innerHTML = rows.map(c=>{
+    const meta = `${esc(c.name || "Anonymous")} • ${new Date(c.created_at).toLocaleString()}`;
+
+    const delBtn = isAdmin
+      ? `<button class="comment-del" data-id="${c.id}" type="button">Delete</button>`
+      : "";
+
+    return `
+      <div class="comment">
+        <div class="meta">
+          <span>${meta}</span>
+          ${delBtn}
+        </div>
+        <div class="text">${esc(c.body)}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Wire up delete buttons
+  if(isAdmin){
+    commentList.querySelectorAll(".comment-del").forEach(btn=>{
+      btn.addEventListener("click", ()=>deleteComment(btn.dataset.id));
+    });
+  }
 }
 
 // Load comments
 async function loadComments(){
   const { data, error } = await supabase
     .from("article_comments")
-    .select("name, body, created_at")
+    .select("id, name, body, created_at")
     .eq("article_id", articleId)
-    .order("created_at", {ascending:false});
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   if(error){
     console.error("loadComments:", error);
     return;
   }
 
-  commentList.innerHTML = data.map(c=>{
-    return `
-      <div class="comment">
-        <div class="meta">${esc(c.name||"Anonymous")} • ${new Date(c.created_at).toLocaleString()}</div>
-        <div class="text">${esc(c.body)}</div>
-      </div>
-    `;
-  }).join("");
+  renderComments(data || []);
 }
 
 // Post comment
 commentForm.addEventListener("submit", async e=>{
   e.preventDefault();
-  commentMsg.textContent="";
+  commentMsg.textContent = "";
 
   const body = commentText.value.trim();
   if(!body){
-    commentMsg.textContent="Write a comment first.";
+    commentMsg.textContent = "Write a comment first.";
     return;
   }
 
@@ -241,24 +296,27 @@ commentForm.addEventListener("submit", async e=>{
     .insert([{
       article_id: articleId,
       name: commentName.value.trim() || null,
-      body
+      body: body.slice(0, 500)
     }]);
 
-  console.log("comment insert:", error);
+  console.log("comment insert:", { error });
 
   if(error){
-    commentMsg.textContent="Could not post.";
+    commentMsg.textContent = "Could not post.";
     return;
   }
 
-  commentText.value="";
-  commentMsg.textContent="Posted!";
+  commentText.value = "";
+  commentMsg.textContent = "Posted!";
   loadComments();
 });
 
-// Initial load
-loadReactions();
-loadComments();
-    
+// Init
+(async function init(){
+  await refreshAdminStatus();
+  await loadReactions();
+  await loadComments();
+})();
+</script>
 </script>
 </html>
