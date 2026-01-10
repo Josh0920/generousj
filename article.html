@@ -15,7 +15,6 @@
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
 
-    /* --- Engagement (like/dislike/comments) --- */
     .engage{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     .engage h3{margin:0 0 10px;font-size:14px;color:#111}
     .reactions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -27,12 +26,11 @@
     .btn:disabled{opacity:.6;cursor:not-allowed}
     .count{color:#555;font-size:13px}
     .commentForm{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
-    .commentForm input,.commentForm textarea{
+    .commentForm input{
       width:100%;border:1px solid #e5e5e5;border-radius:10px;padding:10px;font:inherit
     }
     .commentForm .row{display:grid;grid-template-columns:1fr;gap:10px;width:100%}
     @media (min-width:620px){ .commentForm .row{grid-template-columns:220px 1fr} }
-    .commentForm textarea{min-height:90px;resize:vertical}
     .commentList{margin:10px 0 0;padding:0;list-style:none}
     .comment{
       border:1px solid #e5e5e5;border-radius:14px;padding:12px;margin:10px 0
@@ -45,6 +43,13 @@
       padding:6px 8px;cursor:pointer;font-size:12px
     }
     .smallBtn:hover{background:#f7f7f7}
+
+    .err{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      border:1px solid #ffd0d0;background:#fff5f5;color:#7a1414;
+      padding:12px;border-radius:12px;margin:14px 0;
+      white-space:pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -57,11 +62,12 @@
 
     <img id="featuredImage" alt="" style="display:none; width:100%; height:auto; border:1px solid #e5e5e5; border-radius:14px; margin:0 0 16px;" />
 
+    <div id="errorBox" class="err" style="display:none;"></div>
+
     <div class="body" id="body"></div>
 
     <div class="rule"></div>
 
-    <!-- Like / Dislike / Comments -->
     <section class="engage" id="engagement" style="margin:18px 0;">
       <h3>Feedback</h3>
 
@@ -90,16 +96,14 @@
   <script>
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
-
-    // ✅ Clean, normal Supabase client (no junk inside options)
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
     const params = new URLSearchParams(location.search);
-    const slugParam = params.get("slug");
+    const slugParam = params.get("slug"); // your current link style
+    const idParam = params.get("id");     // optional future link style
 
-    // UI
     const likeBtn = document.getElementById("likeBtn");
     const dislikeBtn = document.getElementById("dislikeBtn");
     const likeCount = document.getElementById("likeCount");
@@ -112,40 +116,48 @@
     const commentStatus = document.getElementById("commentStatus");
     const commentList = document.getElementById("commentList");
 
+    const errorBox = document.getElementById("errorBox");
+    function showErr(msg){
+      errorBox.style.display = "block";
+      errorBox.textContent = msg;
+    }
+
     function escapeHtml(s){
       return (s || "").replace(/[&<>"']/g, (c) => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
       }[c]));
     }
 
-    // ---------- Likes/Dislikes via REST (guarantees apikey header) ----------
+    // --- Likes/Dislikes via REST (guarantees apikey header) ---
     function supaHeaders(){
       return {
         "apikey": SUPABASE_ANON_KEY,
         "Authorization": "Bearer " + SUPABASE_ANON_KEY,
         "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "Prefer": "return=representation, resolution=merge-duplicates"
       };
     }
 
+    function statsKey(){
+      // always use slugParam for stats for now (your comments do the same)
+      return slugParam || "";
+    }
+
     async function statsEnsure(slug){
+      if (!slug) return;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/article_stats`, {
         method: "POST",
         headers: supaHeaders(),
         body: JSON.stringify({ slug })
       });
-
-      // If row exists, ignore duplicate errors
       if (!res.ok) {
         const t = await res.text();
-        const low = t.toLowerCase();
-        if (!low.includes("duplicate") && !low.includes("already exists")) {
-          console.error("statsEnsure error:", t);
-        }
+        console.error("statsEnsure error:", t);
       }
     }
 
     async function statsLoad(slug){
+      if (!slug) return;
       const url = `${SUPABASE_URL}/rest/v1/article_stats?select=likes,dislikes&slug=eq.${encodeURIComponent(slug)}`;
       const res = await fetch(url, { headers: supaHeaders() });
 
@@ -204,41 +216,18 @@
     }
 
     async function initReactions(){
-      if (!slugParam) return;
-      await statsEnsure(slugParam);
-      await statsLoad(slugParam);
-
-      likeBtn.addEventListener("click", () => statsBump(slugParam, "likes"));
-      dislikeBtn.addEventListener("click", () => statsBump(slugParam, "dislikes"));
+      const key = statsKey();
+      if (!key) return;
+      await statsEnsure(key);
+      await statsLoad(key);
+      likeBtn.addEventListener("click", () => statsBump(key, "likes"));
+      dislikeBtn.addEventListener("click", () => statsBump(key, "dislikes"));
     }
 
-    // ---------- Comments (supabase-js) ----------
-    async function isSignedIn(){
-      const { data } = await sb.auth.getUser();
-      return Boolean(data?.user);
-    }
-
-    function renderComment(c, showDelete){
-      const li = document.createElement("li");
-      li.className = "comment";
-      li.innerHTML = `
-        <div class="commentTop">
-          <div>
-            <div><strong>${escapeHtml(c.name || "Anonymous")}</strong></div>
-            <div class="commentMeta">${new Date(c.created_at).toLocaleString()}</div>
-          </div>
-          ${showDelete ? `<button class="smallBtn" data-del="${c.id}">Delete</button>` : ""}
-        </div>
-        <div class="commentBody">${escapeHtml(c.body)}</div>
-      `;
-      return li;
-    }
-
+    // --- Comments (assumes article_comments has "slug") ---
     async function loadComments(){
       commentList.innerHTML = "";
-      const showDelete = await isSignedIn();
 
-      // This assumes your comments table uses "slug" (since your comments are working)
       const { data, error } = await sb
         .from("article_comments")
         .select("id, name, body, created_at")
@@ -256,31 +245,21 @@
         return;
       }
 
-      data.forEach(c => commentList.appendChild(renderComment(c, showDelete)));
+      data.forEach(c => {
+        const li = document.createElement("li");
+        li.className = "comment";
+        li.innerHTML = `
+          <div class="commentTop">
+            <div>
+              <div><strong>${escapeHtml(c.name || "Anonymous")}</strong></div>
+              <div class="commentMeta">${new Date(c.created_at).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="commentBody">${escapeHtml(c.body)}</div>
+        `;
+        commentList.appendChild(li);
+      });
     }
-
-    commentList.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button[data-del]");
-      if (!btn) return;
-
-      const id = btn.getAttribute("data-del");
-      if (!id) return;
-
-      if (!confirm("Delete this comment?")) return;
-
-      commentStatus.textContent = "Deleting…";
-      const { error } = await sb.from("article_comments").delete().eq("id", id);
-
-      if (error){
-        console.error("delete error:", error);
-        commentStatus.textContent = "Delete failed (must be signed in as admin).";
-        return;
-      }
-
-      commentStatus.textContent = "Deleted.";
-      await loadComments();
-      setTimeout(() => (commentStatus.textContent = ""), 1200);
-    });
 
     commentForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -295,12 +274,7 @@
       }
 
       commentStatus.textContent = "Posting…";
-
-      const { error } = await sb.from("article_comments").insert({
-        slug: slugParam,
-        name,
-        body
-      });
+      const { error } = await sb.from("article_comments").insert({ slug: slugParam, name, body });
 
       if (error){
         console.error("comment insert error:", error);
@@ -314,42 +288,76 @@
       setTimeout(() => (commentStatus.textContent = ""), 1200);
     });
 
-    // ---------- Article loader ----------
-    async function loadArticleBySlugOrTitle(slugText){
-      // Try articles.slug first; if column doesn't exist, fallback to title
-      let res = await sb
-        .from("articles")
-        .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-        .eq("slug", slugText)
-        .single();
+    // --- Article loader: tries slug, id, title exact, then title ilike ---
+    async function fetchArticle(){
+      if (!slugParam && !idParam) return { data: null, error: { message: "Missing ?slug= or ?id=" } };
 
-      if (res.error) {
-        const msg = (res.error.message || "").toLowerCase();
-        if (msg.includes("column") && msg.includes("slug")) {
-          res = await sb
-            .from("articles")
-            .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
-            .eq("title", slugText)
-            .single();
+      // 1) by id if provided
+      if (idParam) {
+        const res = await sb
+          .from("articles")
+          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+          .eq("id", idParam)
+          .single();
+        if (!res.error) return res;
+      }
+
+      // 2) by slug (if column exists)
+      if (slugParam) {
+        const resSlug = await sb
+          .from("articles")
+          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+          .eq("slug", slugParam)
+          .single();
+
+        if (!resSlug.error) return resSlug;
+
+        // If slug column does not exist, fall through
+        const msg = (resSlug.error.message || "").toLowerCase();
+        if (!(msg.includes("column") && msg.includes("slug"))) {
+          // Could just be "no rows" — continue to title matching too
         }
       }
 
-      return res;
+      // 3) exact title match
+      if (slugParam) {
+        const resTitle = await sb
+          .from("articles")
+          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+          .eq("title", slugParam)
+          .single();
+        if (!resTitle.error) return resTitle;
+      }
+
+      // 4) case-insensitive contains match (ilike)
+      if (slugParam) {
+        const resILike = await sb
+          .from("articles")
+          .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
+          .ilike("title", `%${slugParam}%`)
+          .limit(1)
+          .maybeSingle();
+        if (!resILike.error && resILike.data) return resILike;
+        return resILike; // return last error if any
+      }
+
+      return { data: null, error: { message: "Could not locate article." } };
     }
 
     async function run(){
-      if(!slugParam){
+      if(!slugParam && !idParam){
         document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "Missing slug.";
+        document.getElementById("body").textContent = "Missing ?slug= or ?id= in the URL.";
         return;
       }
 
-      const { data, error } = await loadArticleBySlugOrTitle(slugParam);
+      const { data, error } = await fetchArticle();
 
-      if(error || !data){
+      if (error || !data){
         console.error("Article load error:", error);
         document.getElementById("title").textContent = "Article not found";
-        document.getElementById("body").textContent = "This article may be a draft or does not exist.";
+        document.getElementById("body").textContent = "Could not load this article.";
+        showErr("Article load error:\n" + JSON.stringify(error, null, 2));
         return;
       }
 
@@ -357,14 +365,12 @@
       document.getElementById("title").textContent = data.title;
 
       const dt = data.published_at || data.updated_at;
-      document.getElementById("meta").textContent =
-        "Published: " + new Date(dt).toLocaleString();
+      document.getElementById("meta").textContent = "Published: " + new Date(dt).toLocaleString();
 
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
         const url = pub && pub.publicUrl;
-
         if (url) {
           img.src = url;
           img.alt = data.image_alt || data.title || "";
@@ -378,8 +384,7 @@
         img.src = "";
       }
 
-      document.getElementById("body").innerHTML =
-        (data.body || "").replace(/\n/g, "<br>");
+      document.getElementById("body").innerHTML = (data.body || "").replace(/\n/g, "<br>");
 
       await initReactions();
       await loadComments();
