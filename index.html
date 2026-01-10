@@ -160,7 +160,22 @@
       color:var(--muted);
       margin-bottom:8px;
     }
+.sectionhead{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
 
+.viewall{
+  font-family:var(--sans);
+  font-size:12px;
+  color:var(--muted);
+  text-transform:none;
+  letter-spacing:0;
+  white-space:nowrap;
+}
     .story{
       padding:10px 0;
       border-bottom:1px solid var(--rule);
@@ -367,12 +382,15 @@
     <div class="wrap">
       <div class="grid">
         <!-- Left column -->
-        <aside class="leftRail">
-          <div class="sectionlabel">Top Stories</div>
+       <aside class="leftRail">
+  <div class="sectionhead">
+    <div class="sectionlabel">Top Stories</div>
+    <a class="viewall" href="all.html">View all →</a>
+  </div>
 
-          <!-- Supabase fills Top Stories here -->
-          <div id="top-stories"></div>
-        </aside>
+  <!-- Supabase fills Top Stories here -->
+  <div id="top-stories"></div>
+</aside>
 
         <!-- Center column -->
         <section class="center">
