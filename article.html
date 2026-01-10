@@ -77,26 +77,33 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-const SUPABASE_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+const SUPABASE_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB"; // your real key
 
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  global: {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`
-    }
-  }
-});
+// IMPORTANT: let Supabase set headers itself
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 document.getElementById("y").textContent = String(new Date().getFullYear());
 
+// slug from URL
 const params = new URLSearchParams(location.search);
-const slug = params.get("slug"); // your links use ?slug=...
+const slugRaw = decodeURIComponent(params.get("slug") || "");
 
-// Engagement key (stable per article)
-const articleKey = slug || (location.pathname + location.search);
+// normalize version
+const slugNorm = slugRaw
+  .trim()
+  .toLowerCase()
+  .replace(/[^\w\s-]/g,"")
+  .replace(/\s+/g,"-");
+
+// use same ID for reactions/comments
+const articleKey = slugNorm || slugRaw;
 
 // Elements
+const titleEl = document.getElementById("title");
+const metaEl = document.getElementById("meta");
+const bodyEl = document.getElementById("body");
+const imgEl = document.getElementById("featuredImage");
+
 const likeCountEl = document.getElementById("likeCount");
 const dislikeCountEl = document.getElementById("dislikeCount");
 const btnLike = document.getElementById("btnLike");
@@ -108,110 +115,85 @@ const commentText = document.getElementById("commentText");
 const commentMsg = document.getElementById("commentMsg");
 const commentList = document.getElementById("commentList");
 
-// Escape HTML
 function esc(s){
   return (s||"").replace(/[&<>"']/g,c=>({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
 
-// Load article
-async function run(){
-  if(!slug){
-    document.getElementById("title").textContent = "Article not found";
-    document.getElementById("body").textContent = "Missing slug.";
+// ---- ARTICLE ----
+async function loadArticle(){
+  if(!slugRaw){
+    titleEl.textContent = "Article not found";
+    bodyEl.textContent = "Missing slug.";
     return;
   }
 
   const { data, error } = await sb
     .from("articles")
-    .select("title, slug, excerpt, body, image_path, image_alt, published_at, updated_at")
-    .eq("slug", slug)
-    .single();
+    .select("*")
+    .ilike("slug", slugNorm)
+    .maybeSingle();
+
+  console.log("article:", {slugRaw, slugNorm, data, error});
 
   if(error || !data){
-    console.log("article load error:", error);
-    document.getElementById("title").textContent = "Article not found";
-    document.getElementById("body").textContent = "This article may be a draft or does not exist.";
+    titleEl.textContent = "Article not found";
+    bodyEl.textContent = "Slug does not match database.";
     return;
   }
 
+  titleEl.textContent = data.title;
   document.title = data.title + " — The Generous J Press";
-  document.getElementById("title").textContent = data.title;
 
   const dt = data.published_at || data.updated_at;
-  document.getElementById("meta").textContent = "Published: " + new Date(dt).toLocaleString();
+  metaEl.textContent = "Published: " + new Date(dt).toLocaleString();
 
-  // Featured image
-  const img = document.getElementById("featuredImage");
-  if (data.image_path) {
+  if(data.image_path){
     const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
-    const url = pub && pub.publicUrl;
-
-    if (url) {
-      img.src = url;
-      img.alt = data.image_alt || data.title || "";
-      img.style.display = "block";
-    } else {
-      img.style.display = "none";
-      img.src = "";
+    if(pub?.publicUrl){
+      imgEl.src = pub.publicUrl;
+      imgEl.alt = data.image_alt || data.title;
+      imgEl.style.display = "block";
     }
-  } else {
-    img.style.display = "none";
-    img.src = "";
   }
 
-  document.getElementById("body").innerHTML = (data.body || "").replace(/\n/g, "<br>");
+  bodyEl.innerHTML = (data.body||"").replace(/\n/g,"<br>");
 }
 
-// Load reactions
+// ---- REACTIONS ----
 async function loadReactions(){
-  const { data, error } = await sb
+  const { data } = await sb
     .from("article_reactions")
-    .select("likes, dislikes")
+    .select("likes,dislikes")
     .eq("article_id", articleKey)
     .maybeSingle();
-
-  console.log("loadReactions:", {data, error});
-
-  if(error) return;
 
   likeCountEl.textContent = data?.likes ?? 0;
   dislikeCountEl.textContent = data?.dislikes ?? 0;
 }
 
-// React
 async function react(kind){
-  const { data, error } = await sb.rpc("react", {
-    article: articleKey,
-    kind
-  });
-
-  console.log("react:", {data, error});
-
-  if(error || !data) return;
-
-  likeCountEl.textContent = data.likes ?? 0;
-  dislikeCountEl.textContent = data.dislikes ?? 0;
+  const { data, error } = await sb.rpc("react",{article:articleKey,kind});
+  console.log("react:",{data,error});
+  if(!error && data){
+    likeCountEl.textContent = data.likes;
+    dislikeCountEl.textContent = data.dislikes;
+  }
 }
 
-btnLike.onclick = ()=>react("like");
-btnDislike.onclick = ()=>react("dislike");
+btnLike.onclick=()=>react("like");
+btnDislike.onclick=()=>react("dislike");
 
-// Load comments
+// ---- COMMENTS ----
 async function loadComments(){
-  const { data, error } = await sb
+  const { data } = await sb
     .from("article_comments")
-    .select("name, body, created_at")
+    .select("name,body,created_at")
     .eq("article_id", articleKey)
-    .order("created_at", {ascending:false})
-    .limit(50);
+    .order("created_at",{ascending:false});
 
-  console.log("loadComments:", {data, error});
-
-  if(error) return;
-
-  commentList.innerHTML = (data||[]).map(c=>`
+  commentList.innerHTML=(data||[]).map(c=>`
     <div class="comment">
       <div class="meta">${esc(c.name||"Anonymous")} • ${new Date(c.created_at).toLocaleString()}</div>
       <div class="text">${esc(c.body)}</div>
@@ -219,37 +201,31 @@ async function loadComments(){
   `).join("");
 }
 
-// Post comment
-commentForm.addEventListener("submit", async e=>{
+commentForm.addEventListener("submit",async e=>{
   e.preventDefault();
-  commentMsg.textContent = "";
-
-  const body = commentText.value.trim();
-  if(!body){
-    commentMsg.textContent = "Write a comment first.";
-    return;
-  }
+  const body=commentText.value.trim();
+  if(!body){commentMsg.textContent="Write a comment first.";return;}
 
   const { error } = await sb
     .from("article_comments")
-    .insert([{ article_id: articleKey, name: commentName.value.trim()||null, body }]);
+    .insert([{article_id:articleKey,name:commentName.value||null,body}]);
 
-  console.log("insert:", { error });
+  console.log("insert:",error);
 
   if(error){
-    commentMsg.textContent = error.message || "Post failed.";
+    commentMsg.textContent=error.message;
     return;
   }
 
-  commentText.value = "";
-  commentMsg.textContent = "Posted!";
+  commentText.value="";
+  commentMsg.textContent="Posted!";
   loadComments();
 });
 
-// Init
-run();
+// ---- INIT ----
+loadArticle();
 loadReactions();
 loadComments();
-  </script>
+</script>
 </body>
 </html>
