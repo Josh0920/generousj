@@ -136,130 +136,129 @@
   </script>
 </body>
   <script type="module">
-  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-  const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
-  const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE"; // use your anon/public key
+const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Use a stable per-article ID.
-  // Best: if your article page already has ?id=... then use that.
-  // Fallback: path + querystring.
-  const articleId = new URLSearchParams(location.search).get("id")
-    || (location.pathname + location.search);
+// Article ID
+const articleId =
+  new URLSearchParams(location.search).get("id") ||
+  location.pathname + location.search;
 
-  const likeCountEl = document.getElementById("likeCount");
-  const dislikeCountEl = document.getElementById("dislikeCount");
-  const btnLike = document.getElementById("btnLike");
-  const btnDislike = document.getElementById("btnDislike");
+// Elements
+const likeCountEl = document.getElementById("likeCount");
+const dislikeCountEl = document.getElementById("dislikeCount");
+const btnLike = document.getElementById("btnLike");
+const btnDislike = document.getElementById("btnDislike");
 
-  const commentForm = document.getElementById("commentForm");
-  const commentName = document.getElementById("commentName");
-  const commentText = document.getElementById("commentText");
-  const commentMsg = document.getElementById("commentMsg");
-  const commentList = document.getElementById("commentList");
+const commentForm = document.getElementById("commentForm");
+const commentName = document.getElementById("commentName");
+const commentText = document.getElementById("commentText");
+const commentMsg = document.getElementById("commentMsg");
+const commentList = document.getElementById("commentList");
 
-  // --- Load reactions ---
-  async function loadReactions(){
-    const { data, error } = await supabase
-      .from("article_reactions")
-      .select("likes, dislikes")
-      .eq("article_id", articleId)
-      .maybeSingle();
+// Load reactions
+async function loadReactions(){
+  const { data, error } = await supabase
+    .from("article_reactions")
+    .select("likes, dislikes")
+    .eq("article_id", articleId)
+    .maybeSingle();
 
-    if (error) return; // fail quietly
-    likeCountEl.textContent = data?.likes ?? 0;
-    dislikeCountEl.textContent = data?.dislikes ?? 0;
+  if(error){
+    console.error("loadReactions:", error);
+    return;
   }
 
-  // --- React (atomic increment via RPC) ---
-  async function react(kind){
-    btnLike.disabled = true;
-    btnDislike.disabled = true;
+  likeCountEl.textContent = data?.likes ?? 0;
+  dislikeCountEl.textContent = data?.dislikes ?? 0;
+}
 
-    const { data, error } = await supabase.rpc("react", {
-      article: articleId,
-      kind
-    });
-
-    if (!error && data){
-      likeCountEl.textContent = data.likes ?? 0;
-      dislikeCountEl.textContent = data.dislikes ?? 0;
-    }
-
-    btnLike.disabled = false;
-    btnDislike.disabled = false;
-  }
-
-  btnLike.addEventListener("click", () => react("like"));
-  btnDislike.addEventListener("click", () => react("dislike"));
-
-  // --- Load comments ---
-  function escapeHtml(s){
-    return (s ?? "").replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    }[c]));
-  }
-
-  function renderComments(rows){
-    commentList.innerHTML = rows.map(r => {
-      const name = r.name?.trim() ? escapeHtml(r.name.trim()) : "Anonymous";
-      const date = new Date(r.created_at).toLocaleString();
-      return `
-        <div class="comment">
-          <div class="meta">${name} • ${date}</div>
-          <div class="text">${escapeHtml(r.body)}</div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  async function loadComments(){
-    const { data, error } = await supabase
-      .from("article_comments")
-      .select("name, body, created_at")
-      .eq("article_id", articleId)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (error) return;
-    renderComments(data || []);
-  }
-
-  // --- Post comment ---
-  commentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    commentMsg.textContent = "";
-
-    const name = commentName.value.trim().slice(0, 50);
-    const body = commentText.value.trim().slice(0, 500);
-
-    if (!body){
-      commentMsg.textContent = "Write a comment first.";
-      return;
-    }
-
-    commentForm.querySelector("button").disabled = true;
-
-    const { error } = await supabase
-      .from("article_comments")
-      .insert([{ article_id: articleId, name: name || null, body }]);
-
-    commentForm.querySelector("button").disabled = false;
-
-    if (error){
-      commentMsg.textContent = "Couldn’t post. Try again.";
-      return;
-    }
-
-    commentText.value = "";
-    commentMsg.textContent = "Posted!";
-    await loadComments();
+// React
+async function react(kind){
+  const { data, error } = await supabase.rpc("react", {
+    article: articleId,
+    kind
   });
 
-  // Initial load
-  loadReactions();
+  console.log("react result:", {data, error});
+
+  if(error) return;
+
+  likeCountEl.textContent = data.likes;
+  dislikeCountEl.textContent = data.dislikes;
+}
+
+btnLike.addEventListener("click", ()=>react("like"));
+btnDislike.addEventListener("click", ()=>react("dislike"));
+
+// Escape HTML
+function esc(s){
+  return (s||"").replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+// Load comments
+async function loadComments(){
+  const { data, error } = await supabase
+    .from("article_comments")
+    .select("name, body, created_at")
+    .eq("article_id", articleId)
+    .order("created_at", {ascending:false});
+
+  if(error){
+    console.error("loadComments:", error);
+    return;
+  }
+
+  commentList.innerHTML = data.map(c=>{
+    return `
+      <div class="comment">
+        <div class="meta">${esc(c.name||"Anonymous")} • ${new Date(c.created_at).toLocaleString()}</div>
+        <div class="text">${esc(c.body)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+// Post comment
+commentForm.addEventListener("submit", async e=>{
+  e.preventDefault();
+  commentMsg.textContent="";
+
+  const body = commentText.value.trim();
+  if(!body){
+    commentMsg.textContent="Write a comment first.";
+    return;
+  }
+
+  const { error } = await supabase
+    .from("article_comments")
+    .insert([{
+      article_id: articleId,
+      name: commentName.value.trim() || null,
+      body
+    }]);
+
+  console.log("comment insert:", error);
+
+  if(error){
+    commentMsg.textContent="Could not post.";
+    return;
+  }
+
+  commentText.value="";
+  commentMsg.textContent="Posted!";
   loadComments();
+});
+
+// Initial load
+loadReactions();
+loadComments();
+    
 </script>
 </html>
