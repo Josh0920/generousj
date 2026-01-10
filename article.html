@@ -14,6 +14,20 @@
     .muted{color:#555;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px}
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
+    /* === Article Engagement === */
+.engagement{border-top:1px solid #e5e5e5;margin-top:28px;padding-top:18px}
+.reactions{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.react-btn{border:1px solid #e5e5e5;background:#fff;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
+.react-btn:active{transform:translateY(1px)}
+.comment-title{margin:0 0 10px 0}
+.comment-form{display:grid;gap:10px;max-width:620px}
+.comment-form input,.comment-form textarea{border:1px solid #e5e5e5;border-radius:10px;padding:10px 12px;font:inherit}
+.comment-submit{border:1px solid #111;background:#111;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer;width:max-content}
+.comment-msg{margin:0;color:#555;font-size:13px}
+.comment-list{margin-top:14px;display:grid;gap:12px;max-width:720px}
+.comment{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
+.comment .meta{font-size:13px;color:#555;margin-bottom:6px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+.comment .text{white-space:pre-wrap}
   </style>
 </head>
 <body>
@@ -32,7 +46,31 @@
     <div class="rule"></div>
     <div class="muted">© <span id="y"></span> The Generous J Press</div>
   </div>
+<!-- Reactions + Comments -->
+<section class="engagement" id="engagement">
+  <div class="reactions">
+    <button id="btnLike" type="button" class="react-btn">
+      👍 <span id="likeCount">0</span>
+    </button>
 
+    <button id="btnDislike" type="button" class="react-btn">
+      👎 <span id="dislikeCount">0</span>
+    </button>
+  </div>
+
+  <div class="comment-box">
+    <h3 class="comment-title">Comments</h3>
+
+    <form id="commentForm" class="comment-form">
+      <input id="commentName" type="text" maxlength="50" placeholder="Name (optional)" />
+      <textarea id="commentText" rows="3" maxlength="500" placeholder="Write a comment..." required></textarea>
+      <button type="submit" class="comment-submit">Post comment</button>
+      <p id="commentMsg" class="comment-msg"></p>
+    </form>
+
+    <div id="commentList" class="comment-list"></div>
+  </div>
+</section>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
@@ -97,4 +135,131 @@
     run();
   </script>
 </body>
+  <script type="module">
+  import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+  const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+  const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE"; // use your anon/public key
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Use a stable per-article ID.
+  // Best: if your article page already has ?id=... then use that.
+  // Fallback: path + querystring.
+  const articleId = new URLSearchParams(location.search).get("id")
+    || (location.pathname + location.search);
+
+  const likeCountEl = document.getElementById("likeCount");
+  const dislikeCountEl = document.getElementById("dislikeCount");
+  const btnLike = document.getElementById("btnLike");
+  const btnDislike = document.getElementById("btnDislike");
+
+  const commentForm = document.getElementById("commentForm");
+  const commentName = document.getElementById("commentName");
+  const commentText = document.getElementById("commentText");
+  const commentMsg = document.getElementById("commentMsg");
+  const commentList = document.getElementById("commentList");
+
+  // --- Load reactions ---
+  async function loadReactions(){
+    const { data, error } = await supabase
+      .from("article_reactions")
+      .select("likes, dislikes")
+      .eq("article_id", articleId)
+      .maybeSingle();
+
+    if (error) return; // fail quietly
+    likeCountEl.textContent = data?.likes ?? 0;
+    dislikeCountEl.textContent = data?.dislikes ?? 0;
+  }
+
+  // --- React (atomic increment via RPC) ---
+  async function react(kind){
+    btnLike.disabled = true;
+    btnDislike.disabled = true;
+
+    const { data, error } = await supabase.rpc("react", {
+      article: articleId,
+      kind
+    });
+
+    if (!error && data){
+      likeCountEl.textContent = data.likes ?? 0;
+      dislikeCountEl.textContent = data.dislikes ?? 0;
+    }
+
+    btnLike.disabled = false;
+    btnDislike.disabled = false;
+  }
+
+  btnLike.addEventListener("click", () => react("like"));
+  btnDislike.addEventListener("click", () => react("dislike"));
+
+  // --- Load comments ---
+  function escapeHtml(s){
+    return (s ?? "").replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  function renderComments(rows){
+    commentList.innerHTML = rows.map(r => {
+      const name = r.name?.trim() ? escapeHtml(r.name.trim()) : "Anonymous";
+      const date = new Date(r.created_at).toLocaleString();
+      return `
+        <div class="comment">
+          <div class="meta">${name} • ${date}</div>
+          <div class="text">${escapeHtml(r.body)}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function loadComments(){
+    const { data, error } = await supabase
+      .from("article_comments")
+      .select("name, body, created_at")
+      .eq("article_id", articleId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) return;
+    renderComments(data || []);
+  }
+
+  // --- Post comment ---
+  commentForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    commentMsg.textContent = "";
+
+    const name = commentName.value.trim().slice(0, 50);
+    const body = commentText.value.trim().slice(0, 500);
+
+    if (!body){
+      commentMsg.textContent = "Write a comment first.";
+      return;
+    }
+
+    commentForm.querySelector("button").disabled = true;
+
+    const { error } = await supabase
+      .from("article_comments")
+      .insert([{ article_id: articleId, name: name || null, body }]);
+
+    commentForm.querySelector("button").disabled = false;
+
+    if (error){
+      commentMsg.textContent = "Couldn’t post. Try again.";
+      return;
+    }
+
+    commentText.value = "";
+    commentMsg.textContent = "Posted!";
+    await loadComments();
+  });
+
+  // Initial load
+  loadReactions();
+  loadComments();
+</script>
 </html>
