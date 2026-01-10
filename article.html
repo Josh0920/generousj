@@ -90,7 +90,13 @@
   <script>
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: {
+    headers: {
+      apikey: SUPABASE_ANON_KEY
+    }
+  }
+});
 
     document.getElementById("y").textContent = String(new Date().getFullYear());
 
