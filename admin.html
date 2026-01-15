@@ -127,16 +127,24 @@
 
       <!-- LEFT: LIST -->
       <div class="card">
-        <h2>Your articles</h2>
-        <div class="row">
-          <input id="search" placeholder="Search title/slug…" />
-          <select id="filterStatus" style="max-width:160px">
-            <option value="all">All</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </div>
-        <div class="list" id="articleList"></div>
+       <h2>Your content</h2>
+<div class="row">
+  <input id="search" placeholder="Search…" />
+
+  <select id="filterType" style="max-width:160px">
+    <option value="all" selected>All</option>
+    <option value="article">Articles</option>
+    <option value="market">Bets</option>
+  </select>
+
+  <select id="filterStatus" style="max-width:160px">
+    <option value="all">All</option>
+    <option value="draft">Draft</option>
+    <option value="published">Published</option>
+  </select>
+</div>
+
+<div class="list" id="articleList"></div>
         <div class="status" id="listStatus"></div>
       </div>
 
