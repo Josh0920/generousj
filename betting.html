@@ -563,7 +563,7 @@
     return [];
   }
 
-  return (data || []).map(m => ({
+    return (data || []).map(m => ({
     id: m.id,
     title: m.title || "",
     category: m.category || "General",
@@ -574,18 +574,6 @@
     no_votes: Number(m.no_votes ?? 0) || 0
   }));
 }
-
-      return (data || []).map(m => ({
-        id: m.id,
-        title: m.title || "",
-        category: m.category || "General",
-        closes_at: m.closes_at,
-        created_at: m.created_at,
-        updated_at: m.updated_at,
-        yes_votes: Number(m.yes_votes ?? 0) || 0,
-        no_votes: Number(m.no_votes ?? 0) || 0
-      }));
-    }
 
     async function loadMarkets(keepSelection=false){
       const data = await fetchMarkets();
