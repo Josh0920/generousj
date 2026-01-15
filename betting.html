@@ -208,16 +208,29 @@
     let line = null;
     let resizeObs = null;
 
+    // ---- Live vote subscription + incremental chart state ----
+    let voteChannel = null;
+    let seriesYes = 0;
+    let seriesNo = 0;
+    let lastSeriesTime = null;
+
     function destroyChart(){
+      if (voteChannel){
+        sb.removeChannel(voteChannel);
+        voteChannel = null;
+      }
       if (resizeObs) { resizeObs.disconnect(); resizeObs = null; }
       if (chart) { chart.remove(); chart = null; line = null; }
+      seriesYes = 0;
+      seriesNo = 0;
+      lastSeriesTime = null;
     }
 
     function initChart(){
       const el = document.getElementById("chart");
       if (!el) return;
 
-      destroyChart();
+      // (do NOT destroy here; renderMarketChart controls lifecycle)
 
       chart = createChart(el, {
         width: el.clientWidth,
@@ -307,23 +320,136 @@
         .map(([time, value]) => ({ time, value }));
     }
 
+    function pushVotePoint(vote){
+      if (!line) return;
+
+      if (vote.side === "yes") seriesYes++;
+      else if (vote.side === "no") seriesNo++;
+
+      const total = seriesYes + seriesNo;
+      const pYes = total ? (seriesYes / total) * 100 : 50;
+
+      let t = toUnixSeconds(vote.created_at || new Date().toISOString());
+
+      // ensure strictly increasing times for visible ticks
+      if (lastSeriesTime !== null && t <= lastSeriesTime) t = lastSeriesTime + 1;
+      lastSeriesTime = t;
+
+      line.update({ time: t, value: pYes });
+      chart?.timeScale()?.scrollToRealTime();
+    }
+
+    function updateDetailStatsInPlace(){
+      if (!selected) return;
+
+      const p = pct(selected.yes_votes, selected.no_votes);
+
+      // bar fill
+      const barFill = document.querySelector('#detail .bar > div');
+      if (barFill) barFill.style.width = `${p.yes}%`;
+
+      // small % under YES/NO labels
+      const yesSpan = document.querySelector('#voteYes span');
+      const noSpan  = document.querySelector('#voteNo span');
+      if (yesSpan) yesSpan.textContent = `${p.yes}%`;
+      if (noSpan)  noSpan.textContent  = `${p.no}%`;
+
+      // big right-side %
+      const bigs = document.querySelectorAll('#detail .twoside .bigbtn div[style*="font-weight:900"]');
+      if (bigs && bigs.length >= 2){
+        bigs[0].textContent = `${p.yes}%`;
+        bigs[1].textContent = `${p.no}%`;
+      }
+
+      // stats: Total, Yes, No
+      const stats = document.querySelectorAll('#detail .stat .v');
+      if (stats && stats.length >= 3){
+        stats[0].textContent = `${p.t}`;
+        stats[1].textContent = `${selected.yes_votes}`;
+        stats[2].textContent = `${selected.no_votes}`;
+      }
+    }
+
+    function startRealtimeForMarket(marketId){
+      if (voteChannel){
+        sb.removeChannel(voteChannel);
+        voteChannel = null;
+      }
+
+      voteChannel = sb
+        .channel(`votes-market-${marketId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "votes", filter: `market_id=eq.${marketId}` },
+          (payload) => {
+            const v = payload.new;
+
+            // update chart instantly
+            pushVotePoint(v);
+
+            // update in-memory counters instantly (list + detail)
+            const m = markets.find(x => String(x.id) === String(marketId));
+            if (m){
+              if (v.side === "yes") m.yes_votes = (Number(m.yes_votes) || 0) + 1;
+              if (v.side === "no")  m.no_votes  = (Number(m.no_votes)  || 0) + 1;
+            }
+
+            if (selected && String(selected.id) === String(marketId)){
+              // keep selected synced
+              if (m) selected = m;
+
+              // refresh list probabilities
+              renderList();
+
+              // refresh right-side stats without re-rendering chart
+              updateDetailStatsInPlace();
+            }
+          }
+        )
+        .subscribe();
+    }
+
     async function renderMarketChart(marketId){
       const el = document.getElementById("chart");
       if (!el) return;
 
-      if (!chart) initChart();
+      // IMPORTANT: detail HTML recreates #chart; must rebuild chart each market switch
+      destroyChart();
+      initChart();
 
       const series = await loadMarketSeries(marketId);
+
+      // rebuild counts + last time (so live updates continue correctly)
+      const { data: votes, error } = await sb
+        .from("votes")
+        .select("created_at, side")
+        .eq("market_id", marketId)
+        .order("created_at", { ascending: true });
+
+      if (!error && votes && votes.length){
+        seriesYes = 0; seriesNo = 0;
+        for (const v of votes){
+          if (v.side === "yes") seriesYes++;
+          else if (v.side === "no") seriesNo++;
+        }
+        lastSeriesTime = toUnixSeconds(votes[votes.length - 1].created_at);
+      } else {
+        seriesYes = 0; seriesNo = 0;
+        lastSeriesTime = series.length ? series[series.length - 1].time : null;
+      }
 
       if (!series.length){
         const now = Math.floor(Date.now() / 1000);
         line.setData([{ time: now, value: 50 }]);
         chart.timeScale().fitContent();
+        startRealtimeForMarket(marketId);
         return;
       }
 
       line.setData(series);
       chart.timeScale().fitContent();
+
+      startRealtimeForMarket(marketId);
     }
 
     function fmtEnds(iso){
@@ -422,6 +548,7 @@
           <div class="small">Click any row to view it here and vote YES/NO.</div>
           <div class="notice">Tip: This is “voting” styled like a prediction market.</div>
         `;
+        destroyChart();
         return;
       }
       const p = pct(selected.yes_votes, selected.no_votes);
@@ -540,7 +667,7 @@
       }
 
       await loadMarkets(true);
-      if (selected) renderMarketChart(selected.id);
+      // chart updates via realtime INSERT; no need to rebuild here
     }
 
     function getOrMakeVoterHash(){
@@ -553,27 +680,27 @@
     }
 
     async function fetchMarkets(){
-  const { data, error } = await sb
-    .from("markets")
-    .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
-    .order("created_at", { ascending: false });
+      const { data, error } = await sb
+        .from("markets")
+        .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
+        .order("created_at", { ascending: false });
 
-  if (error){
-    console.error(error);
-    return [];
-  }
+      if (error){
+        console.error(error);
+        return [];
+      }
 
-    return (data || []).map(m => ({
-    id: m.id,
-    title: m.title || "",
-    category: m.category || "General",
-    closes_at: m.closes_at,
-    created_at: m.created_at,
-    updated_at: m.updated_at ?? m.created_at, // ✅ fallback so other code can still use updated_at safely
-    yes_votes: Number(m.yes_votes ?? 0) || 0,
-    no_votes: Number(m.no_votes ?? 0) || 0
-  }));
-}
+      return (data || []).map(m => ({
+        id: m.id,
+        title: m.title || "",
+        category: m.category || "General",
+        closes_at: m.closes_at,
+        created_at: m.created_at,
+        updated_at: m.updated_at ?? m.created_at, // ✅ fallback so other code can still use updated_at safely
+        yes_votes: Number(m.yes_votes ?? 0) || 0,
+        no_votes: Number(m.no_votes ?? 0) || 0
+      }));
+    }
 
     async function loadMarkets(keepSelection=false){
       const data = await fetchMarkets();
