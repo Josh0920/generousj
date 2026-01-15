@@ -582,8 +582,8 @@ let selectedMarketId = null;
 async function loadMarkets(){
   const { data, error } = await supabase
     .from("markets")
-    .select("id,title,category,closes_at,yes_votes,no_votes,created_at,updated_at")
-    .order("updated_at", { ascending: false });
+    .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
+    .order("created_at", { ascending: false });
 
   if (error) {
     setListStatus("Error loading markets: " + error.message);
@@ -591,6 +591,15 @@ async function loadMarkets(){
     renderList();
     return;
   }
+
+  // add a safe updated_at fallback so renderList sorting still works
+  marketsCache = (data || []).map(m => ({
+    ...m,
+    updated_at: m.updated_at ?? m.created_at
+  }));
+
+  renderList();
+}
 
   marketsCache = data || [];
   renderList();
