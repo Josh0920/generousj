@@ -243,10 +243,23 @@
           scaleMargins: { top: 0.15, bottom: 0.15 }
         },
         timeScale: {
-          borderColor: "#eeeeee",
-          timeVisible: true,
-          secondsVisible: false,
-        },
+  borderColor: "#eeeeee",
+  timeVisible: true,
+  secondsVisible: false,
+  tickMarkFormatter: (time) => {
+    const d = new Date(time * 1000);
+
+    // Convert to EST
+    const est = new Date(d.toLocaleString("en-US", { timeZone: "America/New_York" }));
+
+    let h = est.getHours();
+    const m = est.getMinutes().toString().padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+
+    return `${h}:${m} ${ampm}`;
+  }
+},
         crosshair: {
           vertLine: { color: "#cfcfcf", width: 1, style: 0 },
           horzLine: { color: "#cfcfcf", width: 1, style: 0 },
