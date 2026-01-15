@@ -186,7 +186,39 @@
 
         <div class="status" id="editStatus"></div>
       </div>
+<!-- RIGHT: BETTING / MARKETS -->
+<div class="card">
+  <h2>Betting (Markets)</h2>
 
+  <label>Question / Title</label>
+  <input id="m_title" placeholder="Will ____ happen by ____?" />
+
+  <div class="row">
+    <div>
+      <label>Category</label>
+      <select id="m_category">
+        <option value="General" selected>General</option>
+        <option value="Politics">Politics</option>
+        <option value="Sports">Sports</option>
+        <option value="Campus">Campus</option>
+        <option value="Entertainment">Entertainment</option>
+        <option value="World">World</option>
+      </select>
+    </div>
+
+    <div style="max-width:260px">
+      <label>Closes at</label>
+      <input id="m_closes" type="datetime-local" />
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <button id="m_create" class="primary" type="button">Publish Market</button>
+    <button id="m_clear" type="button">Clear</button>
+  </div>
+
+  <div class="status" id="m_status"></div>
+</div>
     </div>
   </div>
 
@@ -232,7 +264,15 @@
   const btnRemoveImage = document.getElementById("btnRemoveImage");
   const imagePreviewEl = document.getElementById("imagePreview");
   const imageAltEl = document.getElementById("imageAlt");
+  // ✅ ADDED: Betting DOM
+  const mTitleEl = document.getElementById("m_title");
+  const mCategoryEl = document.getElementById("m_category");
+  const mClosesEl = document.getElementById("m_closes");
+  const mCreateBtn = document.getElementById("m_create");
+  const mClearBtn = document.getElementById("m_clear");
+  const mStatusEl = document.getElementById("m_status");
 
+  const setMarketStatus = (m="") => (mStatusEl.textContent = m);
   const setLoginStatus = (m="") => (loginStatus.textContent = m);
   const setListStatus  = (m="") => (listStatusEl.textContent = m);
   const setEditStatus  = (m="") => (editStatusEl.textContent = m);
@@ -583,7 +623,63 @@
       btnDelete.disabled = false;
     }
   });
+  // ==========================
+  // ✅ BETTING: Create markets
+  // ==========================
+  function clearMarketForm(){
+    if (mTitleEl) mTitleEl.value = "";
+    if (mCategoryEl) mCategoryEl.value = "General";
+    if (mClosesEl) mClosesEl.value = "";
+    setMarketStatus("");
+  }
 
+  async function createMarket(){
+    setMarketStatus("");
+
+    // Require being signed in (matches your admin-only intent)
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess?.session?.user) {
+      setMarketStatus("You must be signed in to publish a market.");
+      return;
+    }
+
+    const title = (mTitleEl?.value || "").trim();
+    const category = (mCategoryEl?.value || "General").trim();
+    const closesLocal = mClosesEl?.value;
+
+    if (!title) return setMarketStatus("Title is required.");
+    if (!closesLocal) return setMarketStatus("Closes-at date/time is required.");
+
+    const closesAt = new Date(closesLocal);
+    if (isNaN(closesAt.getTime())) return setMarketStatus("Invalid closes-at date/time.");
+
+    mCreateBtn.disabled = true;
+    setMarketStatus("Publishing market…");
+
+    try {
+      const { error } = await supabase
+        .from("markets")
+        .insert([{
+          title,
+          category,
+          closes_at: closesAt.toISOString(),
+          yes_votes: 0,
+          no_votes: 0
+        }]);
+
+      if (error) throw error;
+
+      setMarketStatus("Published ✅");
+      clearMarketForm();
+    } catch (e) {
+      setMarketStatus("Publish error: " + (e?.message ?? String(e)));
+    } finally {
+      mCreateBtn.disabled = false;
+    }
+  }
+
+  mCreateBtn?.addEventListener("click", createMarket);
+  mClearBtn?.addEventListener("click", clearMarketForm);
   // --- Boot: if already signed in, show dashboard ---
   const { data: sess } = await supabase.auth.getSession();
   if (sess?.session?.user) {
