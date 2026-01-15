@@ -105,6 +105,19 @@
       }[c]));
     }
 
+    /* ✅ NEW: auto-link plain URLs + preserve line breaks */
+    function autoLinkTextToHtml(text){
+      const s = escapeHtml(text || "");
+
+      // Turn URLs into clickable links (http/https)
+      const linked = s.replace(
+        /(\bhttps?:\/\/[^\s<]+[^\s<\)\]\}\.,;:"'!?])/g,
+        '<a href="$1" target="_blank" rel="noopener">$1</a>'
+      );
+
+      return linked.replace(/\n/g, "<br>");
+    }
+
     function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
     function keyFor(){
@@ -293,8 +306,8 @@
         img.src = "";
       }
 
-      document.getElementById("body").innerHTML =
-        (data.body || "").replace(/\n/g, "<br>");
+      /* ✅ CHANGED: linkify + line breaks */
+      document.getElementById("body").innerHTML = autoLinkTextToHtml(data.body || "");
 
       await loadComments();
     }
