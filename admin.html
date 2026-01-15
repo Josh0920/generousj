@@ -548,6 +548,7 @@ let selectedMarketId = null;
           mClosesEl.value = "";
         }
 
+        if (mCreateBtn) mCreateBtn.textContent = "Update Market";
         setMarketStatus("Loaded bet ✅");
       });
     }
@@ -746,6 +747,8 @@ await loadMarkets();
     if (mTitleEl) mTitleEl.value = "";
     if (mCategoryEl) mCategoryEl.value = "General";
     if (mClosesEl) mClosesEl.value = "";
+    selectedMarketId = null;
+    if (mCreateBtn) mCreateBtn.textContent = "Publish Market";
     setMarketStatus("");
   }
 
@@ -770,63 +773,91 @@ await loadMarkets();
     if (isNaN(closesAt.getTime())) return setMarketStatus("Invalid closes-at date/time.");
 
     mCreateBtn.disabled = true;
-    setMarketStatus("Publishing market…");
+    setMarketStatus(selectedMarketId ? "Updating market…" : "Publishing market…");
 
     try {
-      const { error } = await supabase
-        .from("markets")
-        .insert([{
-          title,
-          category,
-          closes_at: closesAt.toISOString(),
-          yes_votes: 0,
-          no_votes: 0
-        }]);
+      if (selectedMarketId) {
+        const { error } = await supabase
+          .from("markets")
+          .update({
+            title,
+            category,
+            closes_at: closesAt.toISOString()
+          })
+          .eq("id", selectedMarketId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setMarketStatus("Published ✅");
-      clearMarketForm();
+        setMarketStatus("Updated ✅");
+      } else {
+        const { data, error } = await supabase
+          .from("markets")
+          .insert([{
+            title,
+            category,
+            closes_at: closesAt.toISOString(),
+            yes_votes: 0,
+            no_votes: 0
+          }])
+          .select("id")
+          .single();
+
+        if (error) throw error;
+
+        selectedMarketId = data?.id ?? null;
+        if (mCreateBtn) mCreateBtn.textContent = "Update Market";
+        setMarketStatus("Published ✅");
+      }
+
       await loadMarkets();
     } catch (e) {
-      setMarketStatus("Publish error: " + (e?.message ?? String(e)));
+      setMarketStatus((selectedMarketId ? "Update" : "Publish") + " error: " + (e?.message ?? String(e)));
     } finally {
       mCreateBtn.disabled = false;
     }
   }
 
   async function deleteMarket(){
-  setMarketStatus("");
+    setMarketStatus("");
 
-  if (!selectedMarketId){
-    setMarketStatus("Select a bet in 'Your content' first.");
-    return;
+    if (!selectedMarketId){
+      setMarketStatus("Select a bet in 'Your content' first.");
+      return;
+    }
+
+    const ok = confirm("Delete this bet? This cannot be undone.");
+    if (!ok) return;
+
+    mDeleteBtn.disabled = true;
+    setMarketStatus("Deleting…");
+
+    try {
+      // delete votes first (handles FK constraints if votes exist)
+      const { error: votesErr } = await supabase
+        .from("votes")
+        .delete()
+        .eq("market_id", selectedMarketId);
+
+      if (votesErr) throw votesErr;
+
+      const { error } = await supabase
+        .from("markets")
+        .delete()
+        .eq("id", selectedMarketId);
+
+      if (error) throw error;
+
+      selectedMarketId = null;
+      clearMarketForm();
+      setMarketStatus("Deleted ✅");
+      await loadMarkets();
+    } catch (e) {
+      console.error(e);
+      setMarketStatus("Delete error: " + (e?.message ?? String(e)) + " (Check RLS policies.)");
+    } finally {
+      mDeleteBtn.disabled = false;
+    }
   }
-
-  const ok = confirm("Delete this bet? This cannot be undone.");
-  if (!ok) return;
-
-  mDeleteBtn.disabled = true;
-  setMarketStatus("Deleting…");
-
-  try {
-    const { error } = await supabase
-      .from("markets")
-      .delete()
-      .eq("id", selectedMarketId);
-
-    if (error) throw error;
-
-    selectedMarketId = null;
-    clearMarketForm();
-    setMarketStatus("Deleted ✅");
-    await loadMarkets();
-  } catch (e) {
-    setMarketStatus("Delete error: " + (e?.message ?? String(e)));
-  } finally {
-    mDeleteBtn.disabled = false;
-  }
-}
 
 mCreateBtn?.addEventListener("click", createMarket);
 mDeleteBtn?.addEventListener("click", deleteMarket);
