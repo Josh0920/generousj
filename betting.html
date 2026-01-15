@@ -109,6 +109,29 @@
     .stat .v{font-size:16px;font-weight:800;margin-top:2px}
 
     .notice{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.35}
+
+    /* Market graph */
+    .chartWrap{
+      margin-top:14px;
+      border:1px solid var(--rule);
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    #chart{
+      height:240px;
+    }
+    .chartTop{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--rule);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .chartTop strong{color:#111}
   </style>
 </head>
 
@@ -163,6 +186,7 @@
   <!-- Supabase JS (no build tools needed) -->
   <script type="module">
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+    import { createChart } from "https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.esm.production.js";
 
     // ✅ Your existing project info
     const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
@@ -178,6 +202,129 @@
 
     let markets = [];
     let selected = null;
+
+    // ---- Market chart state ----
+    let chart = null;
+    let line = null;
+    let resizeObs = null;
+
+    function destroyChart(){
+      if (resizeObs) { resizeObs.disconnect(); resizeObs = null; }
+      if (chart) { chart.remove(); chart = null; line = null; }
+    }
+
+    function initChart(){
+      const el = document.getElementById("chart");
+      if (!el) return;
+
+      destroyChart();
+
+      chart = createChart(el, {
+        width: el.clientWidth,
+        height: el.clientHeight || 240,
+        layout: { background: { type: "solid", color: "#ffffff" }, textColor: "#111" },
+        grid: {
+          vertLines: { color: "#eeeeee" },
+          horzLines: { color: "#eeeeee" },
+        },
+        rightPriceScale: {
+          borderColor: "#eeeeee",
+          scaleMargins: { top: 0.15, bottom: 0.15 }
+        },
+        timeScale: {
+          borderColor: "#eeeeee",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+        crosshair: {
+          vertLine: { color: "#cfcfcf", width: 1, style: 0 },
+          horzLine: { color: "#cfcfcf", width: 1, style: 0 },
+        }
+      });
+
+      line = chart.addLineSeries({
+        color: "#111",
+        lineWidth: 2,
+        priceFormat: {
+          type: "custom",
+          minMove: 1,
+          formatter: (p) => `${Math.round(p)}%`,
+        },
+      });
+
+      // Keep chart responsive
+      resizeObs = new ResizeObserver(() => {
+        if (!chart) return;
+        chart.applyOptions({ width: el.clientWidth, height: el.clientHeight || 240 });
+      });
+      resizeObs.observe(el);
+    }
+
+    function toUnixSeconds(d){
+      return Math.floor(new Date(d).getTime() / 1000);
+    }
+
+    async function loadMarketSeries(marketId){
+      // NOTE: if your votes table uses "inserted_at" instead of "created_at",
+      // change this select() and the field used below.
+      const { data, error } = await sb
+        .from("votes")
+        .select("created_at, side")
+        .eq("market_id", marketId)
+        .order("created_at", { ascending: true });
+
+      if (error){
+        console.error(error);
+        return [];
+      }
+
+      const votes = data || [];
+      if (!votes.length) return [];
+
+      let yes = 0, no = 0;
+      const points = [];
+
+      for (const v of votes){
+        if (v.side === "yes") yes++;
+        else if (v.side === "no") no++;
+
+        const total = yes + no;
+        const pYes = total ? (yes / total) * 100 : 50;
+
+        points.push({
+          time: toUnixSeconds(v.created_at),
+          value: pYes
+        });
+      }
+
+      // De-duplicate identical timestamps (multiple votes same second)
+      // Keep the last value for each time.
+      const byTime = new Map();
+      for (const pt of points) byTime.set(pt.time, pt.value);
+
+      return Array.from(byTime.entries())
+        .sort((a,b) => a[0] - b[0])
+        .map(([time, value]) => ({ time, value }));
+    }
+
+    async function renderMarketChart(marketId){
+      const el = document.getElementById("chart");
+      if (!el) return;
+
+      if (!chart) initChart();
+
+      const series = await loadMarketSeries(marketId);
+
+      if (!series.length){
+        const now = Math.floor(Date.now() / 1000);
+        line.setData([{ time: now, value: 50 }]);
+        chart.timeScale().fitContent();
+        return;
+      }
+
+      line.setData(series);
+      chart.timeScale().fitContent();
+    }
 
     function fmtEnds(iso){
       const end = new Date(iso);
@@ -201,7 +348,8 @@
     function escapeHtml(s){
       return String(s ?? "")
         .replaceAll("&","&amp;").replaceAll("<","&lt;")
-        .replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;").replaceAll("'","&#039;");
     }
 
     function renderList(){
@@ -283,6 +431,14 @@
           ${escapeHtml(selected.category || "General")} • Ends in <strong>${fmtEnds(selected.closes_at)}</strong>
         </div>
 
+        <div class="chartWrap">
+          <div class="chartTop">
+            <div><strong>Market graph</strong> • YES implied probability</div>
+            <div id="chartHint">updates with every vote</div>
+          </div>
+          <div id="chart"></div>
+        </div>
+
         <div class="bar" title="YES probability">
           <div style="width:${p.yes}%;"></div>
         </div>
@@ -311,6 +467,8 @@
 
       document.getElementById("voteYes").onclick = () => vote(selected.id, "yes");
       document.getElementById("voteNo").onclick = () => vote(selected.id, "no");
+
+      renderMarketChart(selected.id);
     }
 
     function selectMarket(id){
@@ -361,6 +519,7 @@
       }
 
       await loadMarkets(true);
+      if (selected) renderMarketChart(selected.id);
     }
 
     function getOrMakeVoterHash(){
