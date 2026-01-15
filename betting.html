@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Generous J Press — Betting</title>
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --ink:#0a0a0a;
+      --muted:#5a5a5a;
+      --rule:#eaeaea;
+      --card:#ffffff;
+      --shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 24px rgba(0,0,0,.06);
+      --radius:16px;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:1100px;margin:0 auto;padding:22px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .brand{font-weight:800;letter-spacing:-.2px}
+    .tabs{display:flex;gap:10px}
+    .tab{padding:8px 10px;border:1px solid var(--rule);border-radius:999px;font-size:13px;color:#111;background:#fff}
+    .tab.active{background:#111;color:#fff;border-color:#111}
+
+    .toprow{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:14px 0 18px}
+    .search{flex:1;min-width:240px}
+    .search input{
+      width:100%;padding:12px 12px;border:1px solid var(--rule);border-radius:12px;font-size:14px;
+      outline:none;
+    }
+    .filters{display:flex;gap:10px;flex-wrap:wrap}
+    .select{
+      padding:10px 10px;border:1px solid var(--rule);border-radius:12px;font-size:14px;background:#fff;
+    }
+
+    .grid{display:grid;grid-template-columns: 1.1fr .9fr;gap:16px}
+    @media (max-width: 920px){ .grid{grid-template-columns:1fr} }
+
+    .panel{
+      background:var(--card);
+      border:1px solid var(--rule);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .panel h2{
+      margin:0;padding:14px 16px;border-bottom:1px solid var(--rule);
+      font-size:14px;letter-spacing:.2px;text-transform:uppercase;color:#222;
+    }
+
+    /* Market list rows */
+    .list{display:flex;flex-direction:column}
+    .row{
+      padding:14px 16px;
+      display:grid;
+      grid-template-columns: 1fr 120px;
+      gap:14px;
+      border-bottom:1px solid var(--rule);
+    }
+    .row:last-child{border-bottom:none}
+    .q{font-size:15px;font-weight:650;line-height:1.25;margin-bottom:6px}
+    .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+    .pill{border:1px solid var(--rule);border-radius:999px;padding:4px 8px;background:#fff}
+
+    /* Prob bar */
+    .bar{
+      height:10px;border-radius:999px;background:#f3f3f3;overflow:hidden;margin-top:10px;border:1px solid #eee;
+    }
+    .bar > div{height:100%;background:#111;width:50%}
+
+    /* YES/NO buttons */
+    .actions{display:flex;gap:8px;justify-content:flex-end;align-items:flex-start}
+    .btn{
+      width:56px;
+      border-radius:12px;
+      border:1px solid var(--rule);
+      background:#fff;
+      padding:10px 0;
+      font-weight:750;
+      font-size:13px;
+      cursor:pointer;
+    }
+    .btn:hover{border-color:#cfcfcf}
+    .btn.primary{background:#111;color:#fff;border-color:#111}
+
+    /* Right panel: selected market */
+    .detail{padding:16px}
+    .detail h3{margin:0 0 8px;font-size:18px;letter-spacing:-.2px}
+    .detail .small{color:var(--muted);font-size:13px;margin-bottom:14px}
+    .twoside{
+      display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px
+    }
+    .bigbtn{
+      border:1px solid var(--rule);border-radius:14px;background:#fff;padding:12px;
+      display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+    }
+    .bigbtn strong{font-size:14px}
+    .bigbtn span{font-size:12px;color:var(--muted)}
+    .bigbtn.primary{background:#111;color:#fff;border-color:#111}
+    .bigbtn.primary span{color:#d9d9d9}
+
+    .statline{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}
+    .stat{border:1px solid var(--rule);border-radius:14px;padding:10px 12px;background:#fff}
+    .stat .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.2px}
+    .stat .v{font-size:16px;font-weight:800;margin-top:2px}
+
+    .notice{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.35}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><a href="/">The Generous J Press</a></div>
+      <nav class="tabs">
+        <a class="tab" href="/">Home</a>
+        <a class="tab active" href="/betting.html">Betting</a>
+      </nav>
+    </header>
+
+    <div class="toprow">
+      <div class="search">
+        <input id="q" placeholder="Search markets (e.g., 'Trump', 'NFL', 'Florida College')" />
+      </div>
+      <div class="filters">
+        <select id="category" class="select">
+          <option value="">All categories</option>
+          <option>Politics</option>
+          <option>Sports</option>
+          <option>Campus</option>
+          <option>Entertainment</option>
+          <option>World</option>
+        </select>
+        <select id="sort" class="select">
+          <option value="closingSoon">Closing soon</option>
+          <option value="newest">Newest</option>
+          <option value="mostVotes">Most votes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Markets</h2>
+        <div id="list" class="list"></div>
+      </section>
+
+      <aside class="panel">
+        <h2>Market</h2>
+        <div class="detail" id="detail">
+          <h3>Select a market</h3>
+          <div class="small">Click any row to view it here and vote YES/NO.</div>
+          <div class="notice">Tip: This is “voting” styled like a prediction market. You can later add login or limits per user.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Supabase JS (no build tools needed) -->
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // ✅ Your existing project info
+    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const elList = document.getElementById("list");
+    const elDetail = document.getElementById("detail");
+    const elQ = document.getElementById("q");
+    const elCategory = document.getElementById("category");
+    const elSort = document.getElementById("sort");
+
+    let markets = [];
+    let selected = null;
+
+    function fmtEnds(iso){
+      const end = new Date(iso);
+      const now = new Date();
+      const ms = end - now;
+      if (isNaN(end.getTime())) return "—";
+      if (ms <= 0) return "Closed";
+      const hrs = Math.floor(ms/36e5);
+      const days = Math.floor(hrs/24);
+      if (days >= 2) return `${days}d`;
+      return `${hrs}h`;
+    }
+
+    function pct(yes, no){
+      const t = (yes||0)+(no||0);
+      if (!t) return { yes: 50, no: 50, t: 0 };
+      const y = Math.round((yes/t)*100);
+      return { yes: y, no: 100-y, t };
+    }
+
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;").replaceAll("<","&lt;")
+        .replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    }
+
+    function renderList(){
+      const q = elQ.value.trim().toLowerCase();
+      const cat = elCategory.value.trim();
+      const sort = elSort.value;
+
+      let filtered = markets.filter(m => {
+        const matchQ = !q || (m.title || "").toLowerCase().includes(q);
+        const matchC = !cat || (m.category || "") === cat;
+        return matchQ && matchC;
+      });
+
+      if (sort === "newest"){
+        filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      } else if (sort === "mostVotes"){
+        filtered.sort((a,b) => (b.yes_votes+b.no_votes) - (a.yes_votes+a.no_votes));
+      } else { // closingSoon
+        filtered.sort((a,b) => new Date(a.closes_at) - new Date(b.closes_at));
+      }
+
+      elList.innerHTML = filtered.map(m => {
+        const p = pct(m.yes_votes, m.no_votes);
+        return `
+          <div class="row" data-id="${m.id}">
+            <div>
+              <div class="q">${escapeHtml(m.title)}</div>
+              <div class="meta">
+                <span class="pill">${escapeHtml(m.category || "General")}</span>
+                <span>YES ${p.yes}%</span>
+                <span>•</span>
+                <span>${p.t} votes</span>
+                <span>•</span>
+                <span>Ends in ${fmtEnds(m.closes_at)}</span>
+              </div>
+              <div class="bar" title="YES probability">
+                <div style="width:${p.yes}%;"></div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn primary" data-vote="yes">YES</button>
+              <button class="btn" data-vote="no">NO</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // row click selects market; button click votes without selecting confusion
+      elList.querySelectorAll(".row").forEach(row => {
+        row.addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          const id = row.getAttribute("data-id");
+          if (!btn) selectMarket(id);
+        });
+        row.querySelectorAll("button").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const id = row.getAttribute("data-id");
+            const side = btn.getAttribute("data-vote");
+            await vote(id, side);
+          });
+        });
+      });
+    }
+
+    function renderDetail(){
+      if (!selected){
+        elDetail.innerHTML = `
+          <h3>Select a market</h3>
+          <div class="small">Click any row to view it here and vote YES/NO.</div>
+          <div class="notice">Tip: This is “voting” styled like a prediction market.</div>
+        `;
+        return;
+      }
+      const p = pct(selected.yes_votes, selected.no_votes);
+      elDetail.innerHTML = `
+        <h3>${escapeHtml(selected.title)}</h3>
+        <div class="small">
+          ${escapeHtml(selected.category || "General")} • Ends in <strong>${fmtEnds(selected.closes_at)}</strong>
+        </div>
+
+        <div class="bar" title="YES probability">
+          <div style="width:${p.yes}%;"></div>
+        </div>
+
+        <div class="twoside">
+          <div class="bigbtn primary" id="voteYes">
+            <div><strong>YES</strong><br><span>${p.yes}%</span></div>
+            <div style="font-weight:900;">${p.yes}%</div>
+          </div>
+          <div class="bigbtn" id="voteNo">
+            <div><strong>NO</strong><br><span>${p.no}%</span></div>
+            <div style="font-weight:900;">${p.no}%</div>
+          </div>
+        </div>
+
+        <div class="statline">
+          <div class="stat"><div class="k">Total votes</div><div class="v">${p.t}</div></div>
+          <div class="stat"><div class="k">Yes votes</div><div class="v">${selected.yes_votes}</div></div>
+          <div class="stat"><div class="k">No votes</div><div class="v">${selected.no_votes}</div></div>
+        </div>
+
+        <div class="notice">
+          Voting is stored in your database. If you want “one vote per person”, we’ll add auth or a browser ID lock.
+        </div>
+      `;
+
+      document.getElementById("voteYes").onclick = () => vote(selected.id, "yes");
+      document.getElementById("voteNo").onclick = () => vote(selected.id, "no");
+    }
+
+    function selectMarket(id){
+      selected = markets.find(m => String(m.id) === String(id)) || null;
+      renderDetail();
+    }
+
+    // Anonymous “one vote per browser per market” using localStorage key
+    function votedKey(marketId){ return `gjp_vote_${marketId}`; }
+
+    async function vote(marketId, side){
+      // prevent repeats per browser
+      if (localStorage.getItem(votedKey(marketId))){
+        alert("You already voted on this market from this browser.");
+        return;
+      }
+
+      // record vote row
+      const payload = {
+        market_id: marketId,
+        side: side,
+        // optional: browser fingerprint-ish id
+        voter_hash: getOrMakeVoterHash()
+      };
+
+      const { error: voteErr } = await sb.from("votes").insert(payload);
+      if (voteErr){
+        console.error(voteErr);
+        alert("Vote failed. Check your Supabase RLS policies.");
+        return;
+      }
+
+      // increment market counters (server-side is better, but this is simple)
+      const field = side === "yes" ? "yes_votes" : "no_votes";
+      const m = markets.find(x => String(x.id) === String(marketId));
+      if (!m) return;
+
+      const { error: updErr } = await sb
+        .from("markets")
+        .update({ [field]: (m[field] || 0) + 1 })
+        .eq("id", marketId);
+
+      if (updErr){
+        console.error(updErr);
+        alert("Vote recorded, but counter update failed. (You can recompute totals later.)");
+      } else {
+        localStorage.setItem(votedKey(marketId), "1");
+      }
+
+      await loadMarkets(true);
+    }
+
+    function getOrMakeVoterHash(){
+      let v = localStorage.getItem("gjp_voter_hash");
+      if (!v){
+        v = crypto.randomUUID();
+        localStorage.setItem("gjp_voter_hash", v);
+      }
+      return v;
+    }
+
+    async function loadMarkets(keepSelection=false){
+      const { data, error } = await sb
+        .from("markets")
+        .select("id,title,category,closes_at,created_at,yes_votes,no_votes")
+        .order("created_at", { ascending: false });
+
+      if (error){
+        console.error(error);
+        elList.innerHTML = `<div style="padding:16px;color:#b00020;">Failed to load markets. Check Supabase table + RLS.</div>`;
+        return;
+      }
+
+      markets = (data || []).map(m => ({
+        ...m,
+        yes_votes: m.yes_votes || 0,
+        no_votes: m.no_votes || 0
+      }));
+
+      renderList();
+
+      if (keepSelection && selected){
+        const still = markets.find(m => String(m.id) === String(selected.id));
+        selected = still || null;
+      } else if (!selected && markets[0]) {
+        selected = markets[0];
+      }
+      renderDetail();
+    }
+
+    // events
+    [elQ, elCategory, elSort].forEach(el => el.addEventListener("input", renderList));
+    await loadMarkets();
+  </script>
+</body>
+</html>
