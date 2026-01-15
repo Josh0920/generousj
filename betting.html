@@ -230,8 +230,6 @@
       const el = document.getElementById("chart");
       if (!el) return;
 
-      // (do NOT destroy here; renderMarketChart controls lifecycle)
-
       chart = createChart(el, {
         width: el.clientWidth,
         height: el.clientHeight || 240,
@@ -336,6 +334,12 @@
       lastSeriesTime = t;
 
       line.update({ time: t, value: pYes });
+
+      // ✅ SNAP: force last chart value to always match true current % (prevents 14% vs 17% drift)
+      const total2 = seriesYes + seriesNo;
+      const pYes2 = total2 ? (seriesYes / total2) * 100 : 50;
+      line.update({ time: lastSeriesTime, value: pYes2 });
+
       chart?.timeScale()?.scrollToRealTime();
     }
 
@@ -442,12 +446,29 @@
         const now = Math.floor(Date.now() / 1000);
         line.setData([{ time: now, value: 50 }]);
         chart.timeScale().fitContent();
+
+        // ✅ SNAP even on empty series
+        const total = seriesYes + seriesNo;
+        const pYesNow = total ? (seriesYes / total) * 100 : 50;
+        const nowT = Math.floor(Date.now() / 1000);
+        const finalT = (lastSeriesTime !== null) ? Math.max(nowT, lastSeriesTime + 1) : nowT;
+        line.update({ time: finalT, value: pYesNow });
+        lastSeriesTime = finalT;
+
         startRealtimeForMarket(marketId);
         return;
       }
 
       line.setData(series);
       chart.timeScale().fitContent();
+
+      // ✅ SNAP: force last chart value to match the actual latest % from totals
+      const total = seriesYes + seriesNo;
+      const pYesNow = total ? (seriesYes / total) * 100 : 50;
+      const nowT = Math.floor(Date.now() / 1000);
+      const finalT = (lastSeriesTime !== null) ? Math.max(nowT, lastSeriesTime + 1) : nowT;
+      line.update({ time: finalT, value: pYesNow });
+      lastSeriesTime = finalT;
 
       startRealtimeForMarket(marketId);
     }
