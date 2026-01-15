@@ -253,6 +253,7 @@
 
   const searchEl = document.getElementById("search");
   const filterStatusEl = document.getElementById("filterStatus");
+  const filterTypeEl = document.getElementById("filterType");
   const articleListEl = document.getElementById("articleList");
   const listStatusEl = document.getElementById("listStatus");
 
@@ -408,6 +409,8 @@
   let currentUser = null;
   let selectedArticleId = null;
   let articlesCache = [];
+  let marketsCache = [];
+let selectedMarketId = null;
 
   function clearEditor(){
     selectedArticleId = null;
@@ -443,36 +446,114 @@
   }
 
   function renderList(){
-    const q = (searchEl.value || "").trim().toLowerCase();
-    const st = filterStatusEl.value;
+  const q = (searchEl.value || "").trim().toLowerCase();
+  const st = filterStatusEl.value;
+  const ty = filterTypeEl ? filterTypeEl.value : "all";
 
-    const filtered = articlesCache.filter(a => {
-      const matchesText = !q || (a.title || "").toLowerCase().includes(q) || (a.slug || "").toLowerCase().includes(q);
-      const matchesStatus = (st === "all") || a.status === st;
-      return matchesText && matchesStatus;
-    });
+  const combined = [];
 
-    articleListEl.innerHTML = "";
-    if (!filtered.length) {
-      articleListEl.innerHTML = `<div class="muted" style="padding:10px">No articles.</div>`;
-      return;
+  // ---- Articles ----
+  if (ty === "all" || ty === "article") {
+    for (const a of articlesCache) {
+      const matchesText =
+        !q ||
+        (a.title || "").toLowerCase().includes(q) ||
+        (a.slug || "").toLowerCase().includes(q);
+
+      const matchesStatus = true;
+      if (matchesText && matchesStatus) {
+        combined.push({
+          type: "article",
+          sortDate: a.updated_at || a.created_at,
+          data: a
+        });
+      }
     }
+  }
 
-    for (const a of filtered) {
-      const div = document.createElement("div");
-      div.className = "item";
+  // ---- Markets / Bets ----
+  if (ty === "all" || ty === "market") {
+    for (const m of marketsCache) {
+      const matchesText =
+        !q ||
+        (m.title || "").toLowerCase().includes(q) ||
+        (m.category || "").toLowerCase().includes(q);
+
+      // status filter does not apply to markets, so only show them when status filter is "all"
+      const matchesStatus = (st === "all");
+
+      if (matchesText && matchesStatus) {
+        combined.push({
+          type: "market",
+          sortDate: m.updated_at || m.created_at,
+          data: m
+        });
+      }
+    }
+  }
+
+  combined.sort((x, y) => new Date(y.sortDate) - new Date(x.sortDate));
+
+  articleListEl.innerHTML = "";
+  if (!combined.length) {
+    articleListEl.innerHTML = `<div class="muted" style="padding:10px">No results.</div>`;
+    return;
+  }
+
+  for (const item of combined) {
+    const div = document.createElement("div");
+    div.className = "item";
+
+    if (item.type === "article") {
+      const a = item.data;
       div.innerHTML = `
         <div style="font-weight:650">${escapeHtml(a.title || "(untitled)")}
+          <span class="pill">article</span>
           <span class="pill">${escapeHtml(a.status || "draft")}</span>
         </div>
         <div class="muted mono" style="font-size:12px; margin-top:4px;">/${escapeHtml(a.slug || "")}</div>
         <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(a.updated_at || a.created_at).toLocaleString()}</div>
       `;
       div.addEventListener("click", () => fillEditor(a));
-      articleListEl.appendChild(div);
-    }
-  }
+    } else {
+      const m = item.data;
+      const closesTxt = m.closes_at ? new Date(m.closes_at).toLocaleString() : "—";
+      div.innerHTML = `
+        <div style="font-weight:650">${escapeHtml(m.title || "(untitled market)")}
+          <span class="pill">bet</span>
+          <span class="pill">${escapeHtml(m.category || "General")}</span>
+        </div>
+        <div class="muted" style="font-size:12px; margin-top:6px;">Closes: ${closesTxt}</div>
+        <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(m.updated_at || m.created_at).toLocaleString()}</div>
+      `;
+      div.addEventListener("click", () => {
+        selectedMarketId = m.id;
+        mTitleEl.value = m.title || "";
+        mCategoryEl.value = m.category || "General";
 
+        // ISO -> datetime-local
+        if (m.closes_at) {
+          const d = new Date(m.closes_at);
+          if (!isNaN(d.getTime())) {
+            const pad = (n) => String(n).padStart(2, "0");
+            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+            mClosesEl.value =
+              `${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
+          } else {
+            mClosesEl.value = "";
+          }
+        } else {
+          mClosesEl.value = "";
+        }
+
+        setMarketStatus("Loaded bet ✅");
+      });
+    }
+
+    articleListEl.appendChild(div);
+  }
+}
+  
   function escapeHtml(s){
     return (s ?? "").replace(/[&<>"']/g, c => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -480,25 +561,41 @@
   }
 
   async function loadArticles(){
-    setListStatus("Loading…");
-    const { data, error } = await supabase
-      .from("articles")
-      // ✅ CHANGED: include image_path + image_alt (and body)
-      .select("id,title,slug,excerpt,body,status,image_path,image_alt,created_at,updated_at")
-      .order("updated_at", { ascending: false });
+  setListStatus("Loading…");
+  const { data, error } = await supabase
+    .from("articles")
+    .select("id,title,slug,excerpt,body,status,image_path,image_alt,created_at,updated_at")
+    .order("updated_at", { ascending: false });
 
-    if (error) {
-      setListStatus("Error loading: " + error.message);
-      articlesCache = [];
-      renderList();
-      return;
-    }
-
-    articlesCache = data || [];
-    setListStatus("");
+  if (error) {
+    setListStatus("Error loading: " + error.message);
+    articlesCache = [];
     renderList();
+    return;
   }
 
+  articlesCache = data || [];
+  setListStatus("");
+  renderList();
+}
+
+async function loadMarkets(){
+  const { data, error } = await supabase
+    .from("markets")
+    .select("id,title,category,closes_at,yes_votes,no_votes,created_at,updated_at")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    setListStatus("Error loading markets: " + error.message);
+    marketsCache = [];
+    renderList();
+    return;
+  }
+
+  marketsCache = data || [];
+  renderList();
+}
+ 
   // --- Events ---
   titleEl.addEventListener("input", () => {
     // Only auto-generate slug if creating new or slug is empty
@@ -514,6 +611,7 @@
 
   searchEl.addEventListener("input", renderList);
   filterStatusEl.addEventListener("change", renderList);
+  filterTypeEl.addEventListener("change", renderList);
 
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -542,7 +640,8 @@
     currentUser = data.user;
     showAuthedUI(currentUser?.email);
     clearEditor();
-    await loadArticles();
+   await loadArticles();
+    await loadMarkets();
   });
 
   btnSignOut.addEventListener("click", async () => {
@@ -596,6 +695,7 @@
       }
 
       await loadArticles();
+await loadMarkets();
     } catch (e) {
       setEditStatus("Save error: " + (e?.message ?? String(e)));
     } finally {
@@ -625,6 +725,7 @@
       clearEditor();
       setEditStatus("Deleted ✅");
       await loadArticles();
+await loadMarkets();
     } catch (e) {
       setEditStatus("Delete error: " + (e?.message ?? String(e)));
     } finally {
@@ -679,6 +780,7 @@
 
       setMarketStatus("Published ✅");
       clearMarketForm();
+      await loadMarkets();
     } catch (e) {
       setMarketStatus("Publish error: " + (e?.message ?? String(e)));
     } finally {
@@ -695,6 +797,7 @@
     showAuthedUI(currentUser.email);
     clearEditor();
     await loadArticles();
+await loadMarkets();
   } else {
     showLoggedOutUI();
   }
