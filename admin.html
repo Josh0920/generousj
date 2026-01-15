@@ -220,10 +220,11 @@
     </div>
   </div>
 
-  <div class="row" style="margin-top:12px">
-    <button id="m_create" class="primary" type="button">Publish Market</button>
-    <button id="m_clear" type="button">Clear</button>
-  </div>
+ <div class="row" style="margin-top:12px">
+  <button id="m_create" class="primary" type="button">Publish Market</button>
+  <button id="m_delete" class="danger" type="button">Delete Market</button>
+  <button id="m_clear" type="button">Clear</button>
+</div>
 
   <div class="status" id="m_status"></div>
 </div>
@@ -278,8 +279,9 @@
   const mCategoryEl = document.getElementById("m_category");
   const mClosesEl = document.getElementById("m_closes");
   const mCreateBtn = document.getElementById("m_create");
-  const mClearBtn = document.getElementById("m_clear");
-  const mStatusEl = document.getElementById("m_status");
+const mDeleteBtn = document.getElementById("m_delete");
+const mClearBtn = document.getElementById("m_clear");
+const mStatusEl = document.getElementById("m_status");
 
   const setMarketStatus = (m="") => (mStatusEl.textContent = m);
   const setLoginStatus = (m="") => (loginStatus.textContent = m);
@@ -793,8 +795,42 @@ await loadMarkets();
     }
   }
 
-  mCreateBtn?.addEventListener("click", createMarket);
-  mClearBtn?.addEventListener("click", clearMarketForm);
+  async function deleteMarket(){
+  setMarketStatus("");
+
+  if (!selectedMarketId){
+    setMarketStatus("Select a bet in 'Your content' first.");
+    return;
+  }
+
+  const ok = confirm("Delete this bet? This cannot be undone.");
+  if (!ok) return;
+
+  mDeleteBtn.disabled = true;
+  setMarketStatus("Deleting…");
+
+  try {
+    const { error } = await supabase
+      .from("markets")
+      .delete()
+      .eq("id", selectedMarketId);
+
+    if (error) throw error;
+
+    selectedMarketId = null;
+    clearMarketForm();
+    setMarketStatus("Deleted ✅");
+    await loadMarkets();
+  } catch (e) {
+    setMarketStatus("Delete error: " + (e?.message ?? String(e)));
+  } finally {
+    mDeleteBtn.disabled = false;
+  }
+}
+
+mCreateBtn?.addEventListener("click", createMarket);
+mDeleteBtn?.addEventListener("click", deleteMarket);
+mClearBtn?.addEventListener("click", clearMarketForm);
   // --- Boot: if already signed in, show dashboard ---
   const { data: sess } = await supabase.auth.getSession();
   if (sess?.session?.user) {
