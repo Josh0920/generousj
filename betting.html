@@ -531,23 +531,55 @@
       return v;
     }
 
-    async function loadMarkets(keepSelection=false){
-      const { data, error } = await sb
-        .from("markets")
-        .select("id,title,category,closes_at,created_at,yes_votes,no_votes")
-        .order("created_at", { ascending: false });
+    // ✅ FIX: your admin might be inserting into a different table (e.g. "bets").
+    // This tries "markets" first, then falls back to "bets", and normalizes field names.
+    async function fetchMarketsAnyTable(){
+      const tables = ["markets", "bets"];
 
-      if (error){
-        console.error(error);
-        elList.innerHTML = `<div style="padding:16px;color:#b00020;">Failed to load markets. Check Supabase table + RLS.</div>`;
-        return;
+      for (const t of tables){
+        const { data, error } = await sb
+          .from(t)
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (error){
+          // If table doesn't exist or RLS blocks it, try the next one.
+          console.warn(`Fetch failed for table "${t}"`, error);
+          continue;
+        }
+
+        if (data && data.length){
+          return (data || []).map(m => ({
+            id: m.id,
+            title: m.title ?? m.question ?? m.market ?? m.name ?? "",
+            category: m.category ?? m.cat ?? "General",
+            closes_at: m.closes_at ?? m.ends_at ?? m.close_at ?? m.end_at ?? m.closing_at ?? null,
+            created_at: m.created_at ?? m.inserted_at ?? m.created ?? null,
+            yes_votes: Number(m.yes_votes ?? m.yes ?? m.yes_count ?? 0) || 0,
+            no_votes: Number(m.no_votes ?? m.no ?? m.no_count ?? 0) || 0,
+            __table: t
+          }));
+        }
       }
+
+      return [];
+    }
+
+    async function loadMarkets(keepSelection=false){
+      const data = await fetchMarketsAnyTable();
 
       markets = (data || []).map(m => ({
         ...m,
         yes_votes: m.yes_votes || 0,
         no_votes: m.no_votes || 0
       }));
+
+      if (!markets.length){
+        elList.innerHTML = `<div style="padding:16px;color:#666;">No markets found yet. (If you just created one, check your table name / RLS.)</div>`;
+        selected = null;
+        renderDetail();
+        return;
+      }
 
       renderList();
 
