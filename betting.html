@@ -226,7 +226,7 @@
       elList.innerHTML = filtered.map(m => {
         const p = pct(m.yes_votes, m.no_votes);
         return `
-          <div class="row" data-id="${m.id}">
+         <div class="row" id="market-${m.id}" data-id="${m.id}">
             <div>
               <div class="q">${escapeHtml(m.title)}</div>
               <div class="meta">
