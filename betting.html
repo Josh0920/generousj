@@ -553,15 +553,27 @@
     }
 
     async function fetchMarkets(){
-      const { data, error } = await sb
-        .from("markets")
-        .select("id,title,category,closes_at,yes_votes,no_votes,created_at,updated_at")
-        .order("updated_at", { ascending: false });
+  const { data, error } = await sb
+    .from("markets")
+    .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
+    .order("created_at", { ascending: false });
 
-      if (error){
-        console.error(error);
-        return [];
-      }
+  if (error){
+    console.error(error);
+    return [];
+  }
+
+  return (data || []).map(m => ({
+    id: m.id,
+    title: m.title || "",
+    category: m.category || "General",
+    closes_at: m.closes_at,
+    created_at: m.created_at,
+    updated_at: m.updated_at ?? m.created_at, // ✅ fallback so other code can still use updated_at safely
+    yes_votes: Number(m.yes_votes ?? 0) || 0,
+    no_votes: Number(m.no_votes ?? 0) || 0
+  }));
+}
 
       return (data || []).map(m => ({
         id: m.id,
