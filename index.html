@@ -404,10 +404,14 @@
 
         <!-- Right column -->
         <aside class="rightRail">
-          <div class="module">
-            <h3>Most Popular</h3>
-            <div class="muted" id="most-popular" style="margin:0;">No data yet.</div>
-          </div>
+         <div class="module">
+  <div class="sectionhead" style="margin-bottom:10px;">
+    <h3 style="margin:0; text-transform:none; letter-spacing:0;">Latest Betting</h3>
+    <a class="viewall" href="betting.html">View all →</a>
+  </div>
+
+  <div id="hp-betting" class="muted" style="margin:0;">Loading latest markets…</div>
+</div>
 
           <div style="height:14px"></div>
 
@@ -583,6 +587,94 @@ lead.innerHTML = `
     }
 
     loadHomepageStories();
+async function loadHomepageBetting(){
+      const box = document.getElementById("hp-betting");
+      if(!box) return;
+
+      const escapeHtml = (s) =>
+        String(s || "")
+          .replaceAll("&","&amp;")
+          .replaceAll("<","&lt;")
+          .replaceAll(">","&gt;")
+          .replaceAll('"',"&quot;")
+          .replaceAll("'","&#039;");
+
+      const pct = (yes, no) => {
+        const t = (yes||0) + (no||0);
+        if(!t) return { yes: 50, no: 50, t: 0 };
+        const y = Math.round((yes/t)*100);
+        return { yes: y, no: 100-y, t };
+      };
+
+      const fmtEnds = (iso) => {
+        const end = new Date(iso);
+        const now = new Date();
+        const ms = end - now;
+        if (isNaN(end.getTime())) return "—";
+        if (ms <= 0) return "Closed";
+        const hrs = Math.floor(ms/36e5);
+        const days = Math.floor(hrs/24);
+        if (days >= 2) return `${days}d`;
+        return `${hrs}h`;
+      };
+
+      // Pull the newest 3 markets (change to .order("closes_at") if you want "closing soon")
+      const { data, error } = await sb
+        .from("markets")
+        .select("id,title,category,closes_at,created_at,yes_votes,no_votes")
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if(error){
+        console.error(error);
+        box.textContent = "Failed to load markets.";
+        return;
+      }
+
+      if(!data || data.length === 0){
+        box.textContent = "No markets yet.";
+        return;
+      }
+
+      box.classList.remove("muted");
+      box.style.margin = "0";
+
+      box.innerHTML = data.map(m => {
+        const y = m.yes_votes || 0;
+        const n = m.no_votes || 0;
+        const p = pct(y, n);
+
+        return `
+          <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
+            <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
+              <a href="betting.html#market-${m.id}">
+                ${escapeHtml(m.title)}
+              </a>
+            </div>
+            <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:6px;">
+              <span>${escapeHtml(m.category || "General")}</span>
+              <span> • </span>
+              <span>YES ${p.yes}%</span>
+              <span> • </span>
+              <span>${p.t} votes</span>
+              <span> • </span>
+              <span>Ends in ${fmtEnds(m.closes_at)}</span>
+            </div>
+            <div style="height:8px; border:1px solid #eee; border-radius:999px; overflow:hidden; background:#f3f3f3; margin-top:8px;">
+              <div style="height:100%; width:${p.yes}%; background:#111;"></div>
+            </div>
+          </div>
+        `;
+      }).join("") + `<div style="padding-top:10px;">
+        <a class="btn" href="betting.html" style="display:inline-block;">Open Betting →</a>
+      </div>`;
+
+      // remove last border
+      const kids = box.querySelectorAll("div[style*='border-bottom']");
+      if(kids.length) kids[kids.length - 1].style.borderBottom = "none";
+    }
+
+    loadHomepageBetting();
   </script>
 </body>
 </html>
