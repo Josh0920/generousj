@@ -480,6 +480,15 @@
     function votedKey(marketId){ return `gjp_vote_${marketId}`; }
 
     async function vote(marketId, side){
+      const m0 = markets.find(x => String(x.id) === String(marketId));
+      if (m0?.closes_at){
+        const end = new Date(m0.closes_at);
+        if (!isNaN(end.getTime()) && end.getTime() <= Date.now()){
+          alert("This market is closed.");
+          return;
+        }
+      }
+
       // prevent repeats per browser
       if (localStorage.getItem(votedKey(marketId))){
         alert("You already voted on this market from this browser.");
@@ -501,14 +510,26 @@
         return;
       }
 
-      // increment market counters (server-side is better, but this is simple)
+      // increment market counters (best-effort: read latest counters, then update)
       const field = side === "yes" ? "yes_votes" : "no_votes";
-      const m = markets.find(x => String(x.id) === String(marketId));
-      if (!m) return;
+
+      const { data: cur, error: curErr } = await sb
+        .from("markets")
+        .select("yes_votes,no_votes")
+        .eq("id", marketId)
+        .single();
+
+      if (curErr){
+        console.error(curErr);
+        alert("Vote recorded, but counter refresh failed. (Check RLS on markets select.)");
+        return;
+      }
+
+      const nextVal = (Number(cur?.[field] ?? 0) || 0) + 1;
 
       const { error: updErr } = await sb
         .from("markets")
-        .update({ [field]: (m[field] || 0) + 1 })
+        .update({ [field]: nextVal })
         .eq("id", marketId);
 
       if (updErr){
@@ -531,42 +552,31 @@
       return v;
     }
 
-    // ✅ FIX: your admin might be inserting into a different table (e.g. "bets").
-    // This tries "markets" first, then falls back to "bets", and normalizes field names.
-    async function fetchMarketsAnyTable(){
-      const tables = ["markets", "bets"];
+    async function fetchMarkets(){
+      const { data, error } = await sb
+        .from("markets")
+        .select("id,title,category,closes_at,yes_votes,no_votes,created_at,updated_at")
+        .order("updated_at", { ascending: false });
 
-      for (const t of tables){
-        const { data, error } = await sb
-          .from(t)
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error){
-          // If table doesn't exist or RLS blocks it, try the next one.
-          console.warn(`Fetch failed for table "${t}"`, error);
-          continue;
-        }
-
-        if (data && data.length){
-          return (data || []).map(m => ({
-            id: m.id,
-            title: m.title ?? m.question ?? m.market ?? m.name ?? "",
-            category: m.category ?? m.cat ?? "General",
-            closes_at: m.closes_at ?? m.ends_at ?? m.close_at ?? m.end_at ?? m.closing_at ?? null,
-            created_at: m.created_at ?? m.inserted_at ?? m.created ?? null,
-            yes_votes: Number(m.yes_votes ?? m.yes ?? m.yes_count ?? 0) || 0,
-            no_votes: Number(m.no_votes ?? m.no ?? m.no_count ?? 0) || 0,
-            __table: t
-          }));
-        }
+      if (error){
+        console.error(error);
+        return [];
       }
 
-      return [];
+      return (data || []).map(m => ({
+        id: m.id,
+        title: m.title || "",
+        category: m.category || "General",
+        closes_at: m.closes_at,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+        yes_votes: Number(m.yes_votes ?? 0) || 0,
+        no_votes: Number(m.no_votes ?? 0) || 0
+      }));
     }
 
     async function loadMarkets(keepSelection=false){
-      const data = await fetchMarketsAnyTable();
+      const data = await fetchMarkets();
 
       markets = (data || []).map(m => ({
         ...m,
@@ -575,7 +585,7 @@
       }));
 
       if (!markets.length){
-        elList.innerHTML = `<div style="padding:16px;color:#666;">No markets found yet. (If you just created one, check your table name / RLS.)</div>`;
+        elList.innerHTML = `<div style="padding:16px;color:#666;">No markets found yet. (If you just created one, check your RLS policies for markets.)</div>`;
         selected = null;
         renderDetail();
         return;
