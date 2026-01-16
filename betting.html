@@ -159,10 +159,10 @@
           <option>World</option>
         </select>
         <select id="sort" class="select">
-          <option value="closingSoon">Closing soon</option>
-          <option value="newest">Newest</option>
-          <option value="mostVotes">Most votes</option>
-        </select>
+  <option value="newest" selected>Newest</option>
+  <option value="closingSoon">Closing soon</option>
+  <option value="mostVotes">Most votes</option>
+</select>
       </div>
     </div>
 
@@ -758,7 +758,8 @@
 
     // events
     [elQ, elCategory, elSort].forEach(el => el.addEventListener("input", renderList));
-    await loadMarkets();
+elSort.value = "newest";
+await loadMarkets();
   </script>
 </body>
 </html>
