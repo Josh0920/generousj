@@ -538,7 +538,9 @@
           (a.title || "").toLowerCase().includes(q) ||
           (a.slug || "").toLowerCase().includes(q);
 
-        const matchesStatus = true;
+        /* ✅ FIXED: status filter actually applies to articles */
+        const matchesStatus = (st === "all") || ((a.status || "draft") === st);
+
         if (matchesText && matchesStatus) {
           combined.push({
             type: "article",
@@ -696,9 +698,21 @@
     }
   });
 
+  /* ✅ FIXED: allow pasting iframe embeds (videos), otherwise keep plain-text paste */
   contentEl.addEventListener("paste", (e) => {
     e.preventDefault();
-    const text = (e.clipboardData || window.clipboardData).getData("text/plain") || "";
+
+    const cd = (e.clipboardData || window.clipboardData);
+    const html = cd ? (cd.getData("text/html") || "") : "";
+    const text = cd ? (cd.getData("text/plain") || "") : "";
+
+    // Allow iframe embeds (YouTube/Vimeo) to be pasted as HTML
+    if (html && /<iframe[\s>]/i.test(html)) {
+      document.execCommand("insertHTML", false, html);
+      return;
+    }
+
+    // Default: paste as plain text
     document.execCommand("insertText", false, text);
   });
 
