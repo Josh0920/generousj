@@ -118,6 +118,64 @@
       return linked.replace(/\n/g, "<br>");
     }
 
+    /* ✅ ADDED: linkify URLs inside existing HTML without breaking <b>/<i>/<u> */
+    function linkifyHtmlPreserve(html){
+      const container = document.createElement("div");
+      container.innerHTML = html || "";
+
+      const urlRe = /(\bhttps?:\/\/[^\s<]+[^\s<\)\]\}\.,;:"'!?])/g;
+
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      for (const node of textNodes) {
+        const parent = node.parentNode;
+        if (!parent) continue;
+
+        const tag = (parent.nodeName || "").toLowerCase();
+        if (tag === "a" || tag === "script" || tag === "style") continue;
+
+        const text = node.nodeValue || "";
+        if (!text) continue;
+
+        // If the text has no URLs and no newlines, skip
+        if (!urlRe.test(text) && text.indexOf("\n") === -1) continue;
+
+        // reset regex state
+        urlRe.lastIndex = 0;
+
+        const frag = document.createDocumentFragment();
+        const parts = text.split(urlRe);
+
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          if (!part) continue;
+
+          if (i % 2 === 1) {
+            // URL
+            const a = document.createElement("a");
+            a.href = part;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = part;
+            frag.appendChild(a);
+          } else {
+            // normal text (preserve \n as <br>)
+            const lines = part.split("\n");
+            for (let j = 0; j < lines.length; j++) {
+              if (lines[j]) frag.appendChild(document.createTextNode(lines[j]));
+              if (j < lines.length - 1) frag.appendChild(document.createElement("br"));
+            }
+          }
+        }
+
+        parent.replaceChild(frag, node);
+      }
+
+      return container.innerHTML;
+    }
+
     function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
     function keyFor(){
@@ -306,8 +364,14 @@
         img.src = "";
       }
 
-      /* ✅ CHANGED: render stored HTML so bold/italic/underline work */
-      document.getElementById("body").innerHTML = (data.body || "");
+      /* ✅ CHANGED: keep old look for plain text, but allow <b>/<i>/<u> + linkify in HTML */
+      const bodyEl = document.getElementById("body");
+      const raw = (data.body || "");
+
+      const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+      bodyEl.innerHTML = looksLikeHtml
+        ? linkifyHtmlPreserve(raw)
+        : autoLinkTextToHtml(raw);
 
       await loadComments();
     }
