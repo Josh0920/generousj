@@ -306,17 +306,22 @@
       .brand .name{ font-size:40px; }
     }
     @media (max-width: 720px){
-      .masthead{
-        grid-template-columns: 1fr;
-        text-align:center;
-      }
-      .masthead .tools{ justify-content:center; flex-wrap:wrap; }
-      .grid{ grid-template-columns: 1fr; }
-      .lead .headline{ font-size:28px; }
-      .subgrid{ grid-template-columns: 1fr; }
-      footer .cols{ grid-template-columns: 1fr 1fr; }
-      .navrow{ justify-content:flex-start; }
-    }
+  .masthead{
+    grid-template-columns: 1fr;
+    text-align:center;
+  }
+  .masthead .tools{ justify-content:center; flex-wrap:wrap; }
+  .grid{ grid-template-columns: 1fr; }
+  .lead .headline{ font-size:28px; }
+  .subgrid{ grid-template-columns: 1fr; }
+  footer .cols{ grid-template-columns: 1fr 1fr; }
+  .navrow{ justify-content:flex-start; }
+
+  /* 🔽 MOBILE ORDER FIX */
+  .center{ order: 1; }     /* Lead Story */
+  .leftRail{ order: 2; }   /* Top Stories */
+  .rightRail{ order: 3; }
+}
   </style>
 </head>
 
