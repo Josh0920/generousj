@@ -89,6 +89,43 @@
     .muted{color:var(--muted)}
     .mono{font-family:var(--mono)}
     .hidden{display:none !important}
+
+    /* --- Rich text editor (ADDED) --- */
+    .rte-toolbar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:8px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:#fff;
+    }
+    .rte-toolbar button{
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#fff;
+      cursor:pointer;
+      font-weight:700;
+      line-height:1;
+    }
+    .rte{
+      width:100%;
+      min-height:260px;
+      padding:10px 10px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font-size:14px;
+      background:#fff;
+      color:var(--text);
+      outline:none;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height:1.5;
+    }
+    .rte:empty:before{
+      content: attr(data-placeholder);
+      color: #999;
+    }
   </style>
 </head>
 <body>
@@ -184,8 +221,16 @@
         <label>Image alt text (recommended)</label>
         <input id="imageAlt" placeholder="Describe the image for accessibility" />
 
-        <label>Content (Markdown or plain text)</label>
-        <textarea id="content" placeholder="# Start writing…"></textarea>
+        <label>Content</label>
+
+        <!-- (CHANGED) Toolbar + contenteditable div replaces textarea -->
+        <div class="rte-toolbar" aria-label="Formatting toolbar">
+          <button type="button" data-cmd="bold"><b>B</b></button>
+          <button type="button" data-cmd="italic"><i>I</i></button>
+          <button type="button" data-cmd="underline"><u>U</u></button>
+        </div>
+
+        <div id="content" class="rte" contenteditable="true" data-placeholder="Start writing…"></div>
 
         <div class="row" style="margin-top:12px">
           <button id="btnSave" class="primary">Save</button>
@@ -420,7 +465,7 @@ let selectedMarketId = null;
     titleEl.value = "";
     slugEl.value = "";
     excerptEl.value = "";
-    contentEl.value = "";
+    contentEl.innerHTML = "";
     statusEl.value = "draft";
     setEditStatus("");
 
@@ -437,7 +482,7 @@ let selectedMarketId = null;
     titleEl.value = a.title || "";
     slugEl.value = a.slug || "";
     excerptEl.value = a.excerpt || "";
-    contentEl.value = a.body || "";
+    contentEl.innerHTML = a.body || "";
     statusEl.value = a.status || "draft";
     setEditStatus("");
 
@@ -605,6 +650,16 @@ async function loadMarkets(){
 }
  
   // --- Events ---
+
+  // (ADDED) Rich text toolbar handler
+  document.querySelectorAll(".rte-toolbar [data-cmd]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const cmd = btn.getAttribute("data-cmd");
+      document.execCommand(cmd, false, null);
+      contentEl.focus();
+    });
+  });
+
   titleEl.addEventListener("input", () => {
     // Only auto-generate slug if creating new or slug is empty
     if (!selectedArticleId && !slugEl.value.trim()) {
@@ -664,7 +719,7 @@ async function loadMarkets(){
     const title = (titleEl.value || "").trim();
     const slug = (slugEl.value || "").trim();
     const excerpt = (excerptEl.value || "").trim();
-    const body = (contentEl.value || "").trim();   // body is required in your DB schema
+    const body = (contentEl.innerHTML || "").trim();   // body is required in your DB schema
     const status = statusEl.value;
 
     // ✅ ADDED: image fields
