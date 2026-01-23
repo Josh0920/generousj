@@ -14,7 +14,8 @@
     .muted{color:#555;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:13px}
     .body{font-size:18px;line-height:1.6}
     .rule{border-top:1px solid #e5e5e5;margin:18px 0}
-        /* Video embeds (ADDED) */
+
+    /* Video embeds (ADDED) */
     .embed{
       position:relative;
       width:100%;
@@ -123,30 +124,23 @@
       }[c]));
     }
 
-    /* ✅ NEW: auto-link plain URLs + preserve line breaks */
+    // Plain-text -> safe HTML with clickable links + <br>
     function autoLinkTextToHtml(text){
       const s = escapeHtml(text || "");
-
-      // Turn URLs into clickable links (http/https)
       const linked = s.replace(
         /(\bhttps?:\/\/[^\s<]+[^\s<\)\]\}\.,;:"'!?])/g,
         '<a href="$1" target="_blank" rel="noopener">$1</a>'
       );
-
       return linked.replace(/\n/g, "<br>");
     }
 
-    /* ✅ ADDED: make embedded iframes responsive (YouTube/Vimeo/etc.) */
+    // Wrap iframes in a responsive container
     function makeEmbedsResponsive(root){
       const iframes = root.querySelectorAll("iframe");
       iframes.forEach(iframe => {
-        // avoid double-wrapping
         if (iframe.parentElement && iframe.parentElement.classList.contains("embed")) return;
-
-        // remove fixed sizing so CSS can control it
         iframe.removeAttribute("width");
         iframe.removeAttribute("height");
-
         const wrap = document.createElement("div");
         wrap.className = "embed";
         iframe.parentNode.insertBefore(wrap, iframe);
@@ -154,7 +148,7 @@
       });
     }
 
-    /* ✅ ADDED: linkify URLs inside existing HTML without breaking <b>/<i>/<u> */
+    // Linkify URLs inside existing HTML without breaking <b>/<i>/<u>
     function linkifyHtmlPreserve(html){
       const container = document.createElement("div");
       container.innerHTML = html || "";
@@ -175,10 +169,12 @@
         const text = node.nodeValue || "";
         if (!text) continue;
 
-        // If the text has no URLs and no newlines, skip
-        if (!urlRe.test(text) && text.indexOf("\n") === -1) continue;
+        // quick check
+        urlRe.lastIndex = 0;
+        const hasUrl = urlRe.test(text);
+        const hasNl = text.indexOf("\n") !== -1;
+        if (!hasUrl && !hasNl) continue;
 
-        // reset regex state
         urlRe.lastIndex = 0;
 
         const frag = document.createDocumentFragment();
@@ -186,10 +182,9 @@
 
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i];
-          if (!part) continue;
+          if (part === "") continue;
 
           if (i % 2 === 1) {
-            // URL
             const a = document.createElement("a");
             a.href = part;
             a.target = "_blank";
@@ -197,7 +192,6 @@
             a.textContent = part;
             frag.appendChild(a);
           } else {
-            // normal text (preserve \n as <br>)
             const lines = part.split("\n");
             for (let j = 0; j < lines.length; j++) {
               if (lines[j]) frag.appendChild(document.createTextNode(lines[j]));
@@ -212,10 +206,14 @@
       return container.innerHTML;
     }
 
+    // ✅ FIX: decide “HTML vs text” safely by checking for actual allowed tags
+    function isRichHtml(raw){
+      return /<(b|strong|i|em|u|iframe|video)\b/i.test(raw || "");
+    }
+
     function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
     function keyFor(){
-      // Prefer article_id if we have it; otherwise fallback to slug string
       if (ARTICLE_ID) return { mode: "article_id", value: ARTICLE_ID };
       return { mode: "slug", value: slugParam || "" };
     }
@@ -249,12 +247,8 @@
 
       let q = sb.from("article_comments").select("id, name, body, created_at");
 
-      // try article_id schema first if possible, else slug schema
-      if (k.mode === "article_id") {
-        q = q.eq("article_id", k.value);
-      } else {
-        q = q.eq("slug", k.value);
-      }
+      if (k.mode === "article_id") q = q.eq("article_id", k.value);
+      else q = q.eq("slug", k.value);
 
       q = q.order("created_at", { ascending: false });
 
@@ -311,10 +305,9 @@
       commentStatus.textContent = "Posting…";
 
       const k = keyFor();
-      let payload;
-
-      if (k.mode === "article_id") payload = { article_id: k.value, name, body };
-      else payload = { slug: k.value, name, body };
+      const payload = (k.mode === "article_id")
+        ? { article_id: k.value, name, body }
+        : { slug: k.value, name, body };
 
       const { error } = await sb.from("article_comments").insert(payload);
 
@@ -331,16 +324,13 @@
       commentStatus.textContent = "";
     });
 
-    // ---------- Article loader (works if articles uses slug OR title) ----------
     async function loadArticleBySlugOrTitle(slugText){
-      // 1) Try articles.slug
       let res = await sb
         .from("articles")
         .select("id, title, excerpt, body, image_path, image_alt, published_at, updated_at")
         .eq("slug", slugText)
         .single();
 
-      // If slug column doesn't exist (or no row), try title fallback
       if (res.error) {
         const msg = (res.error.message || "").toLowerCase();
         if (msg.includes('column') && msg.includes('slug')) {
@@ -371,7 +361,6 @@
         return;
       }
 
-      // ✅ Set ARTICLE_ID only AFTER successful load
       ARTICLE_ID = data.id || null;
 
       document.title = data.title + " — The Generous J Press";
@@ -381,7 +370,6 @@
       document.getElementById("meta").textContent =
         "Published: " + new Date(dt).toLocaleString();
 
-      // featured image
       const img = document.getElementById("featuredImage");
       if (data.image_path) {
         const { data: pub } = sb.storage.from("article-images").getPublicUrl(data.image_path);
@@ -400,16 +388,16 @@
         img.src = "";
       }
 
-      /* ✅ CHANGED: keep old look for plain text, but allow <b>/<i>/<u> + linkify in HTML */
+      // ✅ FIX: render plain text like before, but allow rich HTML when present
       const bodyEl = document.getElementById("body");
       const raw = (data.body || "");
 
-      const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
-      bodyEl.innerHTML = looksLikeHtml
-        ? linkifyHtmlPreserve(raw)
-        : autoLinkTextToHtml(raw);
-
-      makeEmbedsResponsive(bodyEl);
+      if (isRichHtml(raw)) {
+        bodyEl.innerHTML = linkifyHtmlPreserve(raw);
+        makeEmbedsResponsive(bodyEl);
+      } else {
+        bodyEl.innerHTML = autoLinkTextToHtml(raw);
+      }
 
       await loadComments();
     }
