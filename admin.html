@@ -90,7 +90,7 @@
     .mono{font-family:var(--mono)}
     .hidden{display:none !important}
 
-    /* --- Rich text editor (ADDED) --- */
+    /* --- Rich text editor (ADDED earlier) --- */
     .rte-toolbar{
       display:flex;
       gap:8px;
@@ -223,7 +223,6 @@
 
         <label>Content</label>
 
-        <!-- (CHANGED) Toolbar + contenteditable div replaces textarea -->
         <div class="rte-toolbar" aria-label="Formatting toolbar">
           <button type="button" data-cmd="bold"><b>B</b></button>
           <button type="button" data-cmd="italic"><i>I</i></button>
@@ -239,6 +238,7 @@
 
         <div class="status" id="editStatus"></div>
       </div>
+
 <!-- RIGHT: BETTING / MARKETS -->
 <div class="card">
   <h2>Betting (Markets)</h2>
@@ -324,9 +324,9 @@
   const mCategoryEl = document.getElementById("m_category");
   const mClosesEl = document.getElementById("m_closes");
   const mCreateBtn = document.getElementById("m_create");
-const mDeleteBtn = document.getElementById("m_delete");
-const mClearBtn = document.getElementById("m_clear");
-const mStatusEl = document.getElementById("m_status");
+  const mDeleteBtn = document.getElementById("m_delete");
+  const mClearBtn = document.getElementById("m_clear");
+  const mStatusEl = document.getElementById("m_status");
 
   const setMarketStatus = (m="") => (mStatusEl.textContent = m);
   const setLoginStatus = (m="") => (loginStatus.textContent = m);
@@ -457,7 +457,34 @@ const mStatusEl = document.getElementById("m_status");
   let selectedArticleId = null;
   let articlesCache = [];
   let marketsCache = [];
-let selectedMarketId = null;
+  let selectedMarketId = null;
+
+  function escapeHtml(s){
+    return (s ?? "").replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  /* ✅ ADDED: normalize editor HTML so it saves like old text (line breaks), but keeps <b>/<i>/<u> */
+  function normalizeArticleHtml(html){
+    const tmp = document.createElement("div");
+    tmp.innerHTML = (html || "");
+
+    // Convert <div>/<p> blocks into inline content + <br>
+    tmp.querySelectorAll("div,p").forEach(el => {
+      const frag = document.createDocumentFragment();
+      while (el.firstChild) frag.appendChild(el.firstChild);
+      frag.appendChild(document.createElement("br"));
+      el.replaceWith(frag);
+    });
+
+    let out = tmp.innerHTML;
+
+    // Remove trailing breaks
+    out = out.replace(/(<br>\s*)+$/i, "");
+
+    return out;
+  }
 
   function clearEditor(){
     selectedArticleId = null;
@@ -482,7 +509,11 @@ let selectedMarketId = null;
     titleEl.value = a.title || "";
     slugEl.value = a.slug || "";
     excerptEl.value = a.excerpt || "";
-    contentEl.innerHTML = a.body || "";
+
+    const b = a.body || "";
+    const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(b);
+    contentEl.innerHTML = looksLikeHtml ? b : escapeHtml(b).replace(/\n/g, "<br>");
+
     statusEl.value = a.status || "draft";
     setEditStatus("");
 
@@ -493,171 +524,182 @@ let selectedMarketId = null;
   }
 
   function renderList(){
-  const q = (searchEl.value || "").trim().toLowerCase();
-  const st = filterStatusEl.value;
-  const ty = filterTypeEl ? filterTypeEl.value : "all";
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const st = filterStatusEl.value;
+    const ty = filterTypeEl ? filterTypeEl.value : "all";
 
-  const combined = [];
+    const combined = [];
 
-  // ---- Articles ----
-  if (ty === "all" || ty === "article") {
-    for (const a of articlesCache) {
-      const matchesText =
-        !q ||
-        (a.title || "").toLowerCase().includes(q) ||
-        (a.slug || "").toLowerCase().includes(q);
+    // ---- Articles ----
+    if (ty === "all" || ty === "article") {
+      for (const a of articlesCache) {
+        const matchesText =
+          !q ||
+          (a.title || "").toLowerCase().includes(q) ||
+          (a.slug || "").toLowerCase().includes(q);
 
-      const matchesStatus = true;
-      if (matchesText && matchesStatus) {
-        combined.push({
-          type: "article",
-          sortDate: a.updated_at || a.created_at,
-          data: a
-        });
+        const matchesStatus = true;
+        if (matchesText && matchesStatus) {
+          combined.push({
+            type: "article",
+            sortDate: a.updated_at || a.created_at,
+            data: a
+          });
+        }
       }
     }
-  }
 
-  // ---- Markets / Bets ----
-  if (ty === "all" || ty === "market") {
-    for (const m of marketsCache) {
-      const matchesText =
-        !q ||
-        (m.title || "").toLowerCase().includes(q) ||
-        (m.category || "").toLowerCase().includes(q);
+    // ---- Markets / Bets ----
+    if (ty === "all" || ty === "market") {
+      for (const m of marketsCache) {
+        const matchesText =
+          !q ||
+          (m.title || "").toLowerCase().includes(q) ||
+          (m.category || "").toLowerCase().includes(q);
 
-      // status filter does not apply to markets, so only show them when status filter is "all"
-      const matchesStatus = (st === "all");
+        // status filter does not apply to markets, so only show them when status filter is "all"
+        const matchesStatus = (st === "all");
 
-      if (matchesText && matchesStatus) {
-        combined.push({
-          type: "market",
-          sortDate: m.updated_at || m.created_at,
-          data: m
-        });
+        if (matchesText && matchesStatus) {
+          combined.push({
+            type: "market",
+            sortDate: m.updated_at || m.created_at,
+            data: m
+          });
+        }
       }
     }
-  }
 
-  combined.sort((x, y) => new Date(y.sortDate) - new Date(x.sortDate));
+    combined.sort((x, y) => new Date(y.sortDate) - new Date(x.sortDate));
 
-  articleListEl.innerHTML = "";
-  if (!combined.length) {
-    articleListEl.innerHTML = `<div class="muted" style="padding:10px">No results.</div>`;
-    return;
-  }
+    articleListEl.innerHTML = "";
+    if (!combined.length) {
+      articleListEl.innerHTML = `<div class="muted" style="padding:10px">No results.</div>`;
+      return;
+    }
 
-  for (const item of combined) {
-    const div = document.createElement("div");
-    div.className = "item";
+    for (const item of combined) {
+      const div = document.createElement("div");
+      div.className = "item";
 
-    if (item.type === "article") {
-      const a = item.data;
-      div.innerHTML = `
-        <div style="font-weight:650">${escapeHtml(a.title || "(untitled)")}
-          <span class="pill">article</span>
-          <span class="pill">${escapeHtml(a.status || "draft")}</span>
-        </div>
-        <div class="muted mono" style="font-size:12px; margin-top:4px;">/${escapeHtml(a.slug || "")}</div>
-        <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(a.updated_at || a.created_at).toLocaleString()}</div>
-      `;
-      div.addEventListener("click", () => fillEditor(a));
-    } else {
-      const m = item.data;
-      const closesTxt = m.closes_at ? new Date(m.closes_at).toLocaleString() : "—";
-      div.innerHTML = `
-        <div style="font-weight:650">${escapeHtml(m.title || "(untitled market)")}
-          <span class="pill">bet</span>
-          <span class="pill">${escapeHtml(m.category || "General")}</span>
-        </div>
-        <div class="muted" style="font-size:12px; margin-top:6px;">Closes: ${closesTxt}</div>
-        <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(m.updated_at || m.created_at).toLocaleString()}</div>
-      `;
-      div.addEventListener("click", () => {
-        selectedMarketId = m.id;
-        mTitleEl.value = m.title || "";
-        mCategoryEl.value = m.category || "General";
+      if (item.type === "article") {
+        const a = item.data;
+        div.innerHTML = `
+          <div style="font-weight:650">${escapeHtml(a.title || "(untitled)")}
+            <span class="pill">article</span>
+            <span class="pill">${escapeHtml(a.status || "draft")}</span>
+          </div>
+          <div class="muted mono" style="font-size:12px; margin-top:4px;">/${escapeHtml(a.slug || "")}</div>
+          <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(a.updated_at || a.created_at).toLocaleString()}</div>
+        `;
+        div.addEventListener("click", () => fillEditor(a));
+      } else {
+        const m = item.data;
+        const closesTxt = m.closes_at ? new Date(m.closes_at).toLocaleString() : "—";
+        div.innerHTML = `
+          <div style="font-weight:650">${escapeHtml(m.title || "(untitled market)")}
+            <span class="pill">bet</span>
+            <span class="pill">${escapeHtml(m.category || "General")}</span>
+          </div>
+          <div class="muted" style="font-size:12px; margin-top:6px;">Closes: ${closesTxt}</div>
+          <div class="muted" style="font-size:12px; margin-top:6px;">${new Date(m.updated_at || m.created_at).toLocaleString()}</div>
+        `;
+        div.addEventListener("click", () => {
+          selectedMarketId = m.id;
+          mTitleEl.value = m.title || "";
+          mCategoryEl.value = m.category || "General";
 
-        // ISO -> datetime-local
-        if (m.closes_at) {
-          const d = new Date(m.closes_at);
-          if (!isNaN(d.getTime())) {
-            const pad = (n) => String(n).padStart(2, "0");
-            const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-            mClosesEl.value =
-              `${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
+          // ISO -> datetime-local
+          if (m.closes_at) {
+            const d = new Date(m.closes_at);
+            if (!isNaN(d.getTime())) {
+              const pad = (n) => String(n).padStart(2, "0");
+              const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+              mClosesEl.value =
+                `${local.getFullYear()}-${pad(local.getMonth()+1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
+            } else {
+              mClosesEl.value = "";
+            }
           } else {
             mClosesEl.value = "";
           }
-        } else {
-          mClosesEl.value = "";
-        }
 
-        if (mCreateBtn) mCreateBtn.textContent = "Update Market";
-        setMarketStatus("Loaded bet ✅");
-      });
+          if (mCreateBtn) mCreateBtn.textContent = "Update Market";
+          setMarketStatus("Loaded bet ✅");
+        });
+      }
+
+      articleListEl.appendChild(div);
     }
-
-    articleListEl.appendChild(div);
-  }
-}
-  
-  function escapeHtml(s){
-    return (s ?? "").replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    }[c]));
   }
 
   async function loadArticles(){
-  setListStatus("Loading…");
-  const { data, error } = await supabase
-    .from("articles")
-    .select("id,title,slug,excerpt,body,status,image_path,image_alt,created_at,updated_at")
-    .order("updated_at", { ascending: false });
+    setListStatus("Loading…");
+    const { data, error } = await supabase
+      .from("articles")
+      .select("id,title,slug,excerpt,body,status,image_path,image_alt,created_at,updated_at")
+      .order("updated_at", { ascending: false });
 
-  if (error) {
-    setListStatus("Error loading: " + error.message);
-    articlesCache = [];
+    if (error) {
+      setListStatus("Error loading: " + error.message);
+      articlesCache = [];
+      renderList();
+      return;
+    }
+
+    articlesCache = data || [];
+    setListStatus("");
     renderList();
-    return;
   }
 
-  articlesCache = data || [];
-  setListStatus("");
-  renderList();
-}
+  async function loadMarkets(){
+    const { data, error } = await supabase
+      .from("markets")
+      .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
+      .order("created_at", { ascending: false });
 
-async function loadMarkets(){
-  const { data, error } = await supabase
-    .from("markets")
-    .select("id,title,category,closes_at,yes_votes,no_votes,created_at")
-    .order("created_at", { ascending: false });
+    if (error) {
+      setListStatus("Error loading markets: " + error.message);
+      marketsCache = [];
+      renderList();
+      return;
+    }
 
-  if (error) {
-    setListStatus("Error loading markets: " + error.message);
-    marketsCache = [];
+    // add a safe updated_at fallback so renderList sorting still works
+    marketsCache = (data || []).map(m => ({
+      ...m,
+      updated_at: m.updated_at ?? m.created_at
+    }));
+
     renderList();
-    return;
   }
 
-  // add a safe updated_at fallback so renderList sorting still works
-  marketsCache = (data || []).map(m => ({
-    ...m,
-    updated_at: m.updated_at ?? m.created_at
-  }));
-
-  renderList();
-}
- 
   // --- Events ---
 
-  // (ADDED) Rich text toolbar handler
+  // Toolbar handler (kept)
   document.querySelectorAll(".rte-toolbar [data-cmd]").forEach(btn => {
     btn.addEventListener("click", () => {
       const cmd = btn.getAttribute("data-cmd");
       document.execCommand(cmd, false, null);
       contentEl.focus();
     });
+  });
+
+  /* ✅ ADDED: make editor behave like old textarea:
+     - Enter inserts <br> (not <div>/<p>)
+     - Paste inserts plain text (no formatting garbage)
+  */
+  contentEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.execCommand("insertLineBreak");
+    }
+  });
+
+  contentEl.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData("text/plain") || "";
+    document.execCommand("insertText", false, text);
   });
 
   titleEl.addEventListener("input", () => {
@@ -703,7 +745,7 @@ async function loadMarkets(){
     currentUser = data.user;
     showAuthedUI(currentUser?.email);
     clearEditor();
-   await loadArticles();
+    await loadArticles();
     await loadMarkets();
   });
 
@@ -719,7 +761,7 @@ async function loadMarkets(){
     const title = (titleEl.value || "").trim();
     const slug = (slugEl.value || "").trim();
     const excerpt = (excerptEl.value || "").trim();
-    const body = (contentEl.innerHTML || "").trim();   // body is required in your DB schema
+    const body = normalizeArticleHtml((contentEl.innerHTML || "")).trim();
     const status = statusEl.value;
 
     // ✅ ADDED: image fields
@@ -737,7 +779,6 @@ async function loadMarkets(){
       if (selectedArticleId) {
         const { error } = await supabase
           .from("articles")
-          // ✅ CHANGED: include image_path + image_alt
           .update({ title, slug, excerpt, body, status, image_path, image_alt })
           .eq("id", selectedArticleId);
 
@@ -746,7 +787,6 @@ async function loadMarkets(){
       } else {
         const { data, error } = await supabase
           .from("articles")
-          // ✅ CHANGED: include image_path + image_alt
           .insert([{ title, slug, excerpt, body, status, image_path, image_alt }])
           .select("id")
           .single();
@@ -758,7 +798,7 @@ async function loadMarkets(){
       }
 
       await loadArticles();
-await loadMarkets();
+      await loadMarkets();
     } catch (e) {
       setEditStatus("Save error: " + (e?.message ?? String(e)));
     } finally {
@@ -788,13 +828,14 @@ await loadMarkets();
       clearEditor();
       setEditStatus("Deleted ✅");
       await loadArticles();
-await loadMarkets();
+      await loadMarkets();
     } catch (e) {
       setEditStatus("Delete error: " + (e?.message ?? String(e)));
     } finally {
       btnDelete.disabled = false;
     }
   });
+
   // ==========================
   // ✅ BETTING: Create markets
   // ==========================
@@ -914,9 +955,10 @@ await loadMarkets();
     }
   }
 
-mCreateBtn?.addEventListener("click", createMarket);
-mDeleteBtn?.addEventListener("click", deleteMarket);
-mClearBtn?.addEventListener("click", clearMarketForm);
+  mCreateBtn?.addEventListener("click", createMarket);
+  mDeleteBtn?.addEventListener("click", deleteMarket);
+  mClearBtn?.addEventListener("click", clearMarketForm);
+
   // --- Boot: if already signed in, show dashboard ---
   const { data: sess } = await supabase.auth.getSession();
   if (sess?.session?.user) {
@@ -924,7 +966,7 @@ mClearBtn?.addEventListener("click", clearMarketForm);
     showAuthedUI(currentUser.email);
     clearEditor();
     await loadArticles();
-await loadMarkets();
+    await loadMarkets();
   } else {
     showLoggedOutUI();
   }
