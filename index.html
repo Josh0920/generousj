@@ -501,7 +501,7 @@
 
       const { data, error } = await sb
         .from("articles")
-        .select("title, slug, excerpt, image_path, image_alt, published_at, updated_at")
+        .select("title, slug, excerpt, image_path, image_alt, cover_image_path, cover_image_alt, published_at, updated_at")
         .eq("status", "published")
         .order("updated_at", { ascending: false })
         .limit(7);
@@ -534,15 +534,18 @@ const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
 
 // ✅ NEW: turn storage path into a real URL
 let leadImgHtml = "";
-if (leadStory.image_path) {
-  const { data: img } = sb.storage.from("article-images").getPublicUrl(leadStory.image_path);
+const leadCardPath = leadStory.cover_image_path || leadStory.image_path;
+const leadCardAlt  = leadStory.cover_image_alt || leadStory.image_alt || "";
+
+if (leadCardPath) {
+  const { data: img } = sb.storage.from("article-images").getPublicUrl(leadCardPath);
   const url = img?.publicUrl;
   if (url) {
     leadImgHtml = `
       <div class="media" style="aspect-ratio: 16/9; margin: 6px 0 12px;">
         <img
           src="${url}"
-          alt="${escapeHtml(leadStory.image_alt || "")}"
+          alt="${escapeHtml(leadCardAlt)}"
           style="width:100%;height:100%;object-fit:cover"
           loading="lazy"
         />
