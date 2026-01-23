@@ -209,7 +209,7 @@
         <label>Excerpt</label>
         <input id="excerpt" placeholder="1–2 sentence summary (optional)" />
 
-        <!-- ✅ ADDED: Cover image upload UI -->
+        <!-- ✅ Cover image upload UI (this is ARTICLE image) -->
         <label>Cover image</label>
         <input id="imageFile" type="file" accept="image/*" />
         <div class="row" style="margin-top:10px">
@@ -221,7 +221,19 @@
         <label>Image alt text (recommended)</label>
         <input id="imageAlt" placeholder="Describe the image for accessibility" />
 
-        <!-- ✅ ADDED: Video upload UI -->
+        <!-- ✅ NEW: INDEX-ONLY cover image -->
+        <label>Cover image (index only)</label>
+        <input id="coverFile" type="file" accept="image/*" />
+        <div class="row" style="margin-top:10px">
+          <button id="btnUploadCover" type="button">Upload cover</button>
+          <button id="btnRemoveCover" type="button">Remove cover</button>
+        </div>
+        <div id="coverPreview" class="status">No cover uploaded.</div>
+
+        <label>Cover alt text (index only)</label>
+        <input id="coverAlt" placeholder="Describe the cover image for accessibility" />
+
+        <!-- ✅ Video upload UI -->
         <label>Video (MP4)</label>
         <input id="videoFile" type="file" accept="video/mp4,video/webm,video/ogg" />
         <div class="row" style="margin-top:10px">
@@ -322,20 +334,27 @@
   const btnSave = document.getElementById("btnSave");
   const btnDelete = document.getElementById("btnDelete");
 
-  // ✅ ADDED: Image DOM
+  // ✅ Image DOM (article.html image)
   const imageFileEl = document.getElementById("imageFile");
   const btnUploadImage = document.getElementById("btnUploadImage");
   const btnRemoveImage = document.getElementById("btnRemoveImage");
   const imagePreviewEl = document.getElementById("imagePreview");
   const imageAltEl = document.getElementById("imageAlt");
 
-  // ✅ ADDED: Video DOM
+  // ✅ NEW: Cover (index-only) DOM
+  const coverFileEl = document.getElementById("coverFile");
+  const btnUploadCover = document.getElementById("btnUploadCover");
+  const btnRemoveCover = document.getElementById("btnRemoveCover");
+  const coverPreviewEl = document.getElementById("coverPreview");
+  const coverAltEl = document.getElementById("coverAlt");
+
+  // ✅ Video DOM
   const videoFileEl = document.getElementById("videoFile");
   const btnUploadVideo = document.getElementById("btnUploadVideo");
   const btnRemoveVideo = document.getElementById("btnRemoveVideo");
   const videoPreviewEl = document.getElementById("videoPreview");
 
-  // ✅ ADDED: Betting DOM
+  // ✅ Betting DOM
   const mTitleEl = document.getElementById("m_title");
   const mCategoryEl = document.getElementById("m_category");
   const mClosesEl = document.getElementById("m_closes");
@@ -390,15 +409,16 @@
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
 
-  // ✅ ADDED: Storage settings + image state
+  // Storage settings + state
   const IMAGE_BUCKET = "article-images";
   let currentImagePath = null;
 
-  // ✅ ADDED: Video storage settings + state
+  // ✅ NEW: index-only cover image state (stored in articles.cover_image_path)
+  let currentCoverPath = null;
+
   const VIDEO_BUCKET = "article-videos";
   let currentVideoPath = null;
 
-  // ✅ ADDED: Image preview helper
   function setImagePreview(path) {
     if (!path) {
       imagePreviewEl.textContent = "No image uploaded.";
@@ -414,7 +434,22 @@
       : `Uploaded ✅\n${path}`;
   }
 
-  // ✅ ADDED: Video preview helper
+  // ✅ NEW: Cover preview helper
+  function setCoverPreview(path){
+    if (!path){
+      coverPreviewEl.textContent = "No cover uploaded.";
+      return;
+    }
+    const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path);
+    const url = data?.publicUrl;
+
+    coverPreviewEl.innerHTML = url
+      ? `<div class="muted" style="margin-bottom:8px">Uploaded ✅</div>
+         <img src="${url}" alt="" style="max-width:100%;border:1px solid #ddd;border-radius:12px" />
+         <div class="muted mono" style="margin-top:8px">${path}</div>`
+      : `Uploaded ✅\n${path}`;
+  }
+
   function setVideoPreview(path) {
     if (!path) {
       videoPreviewEl.textContent = "No video uploaded.";
@@ -431,7 +466,7 @@
       : `Uploaded ✅\n${path}`;
   }
 
-  // ✅ ADDED: Upload/remove events (kept near helpers, after supabase exists)
+  // Upload/remove image (article.html image)
   btnUploadImage.addEventListener("click", async () => {
     setEditStatus("");
 
@@ -489,7 +524,65 @@
     setEditStatus("Image removed (click Save to store this change).");
   });
 
-  // ✅ ADDED: Upload/remove video events
+  // ✅ NEW: Upload/remove cover (index-only)
+  btnUploadCover.addEventListener("click", async () => {
+    setEditStatus("");
+
+    const file = coverFileEl.files?.[0];
+    if (!file) {
+      setEditStatus("Choose a cover image file first.");
+      return;
+    }
+
+    const slug = (slugEl.value || "").trim() || slugify(titleEl.value);
+    if (!slug) {
+      setEditStatus("Add a title (or slug) before uploading a cover.");
+      return;
+    }
+
+    btnUploadCover.disabled = true;
+    setEditStatus("Uploading cover…");
+
+    try {
+      const { data: sess, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr) throw sessErr;
+      const userId = sess?.session?.user?.id;
+      if (!userId) throw new Error("Not signed in.");
+
+      const ext = (file.name.split(".").pop() || "jpg")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "jpg";
+
+      const path = `${userId}/${slug}/cover-index-${Date.now()}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from(IMAGE_BUCKET)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || undefined
+        });
+
+      if (error) throw error;
+
+      currentCoverPath = path;
+      setCoverPreview(currentCoverPath);
+      setEditStatus("Cover uploaded ✅ (now click Save to attach it to the index card).");
+    } catch (e) {
+      setEditStatus("Cover upload error: " + (e?.message ?? String(e)));
+    } finally {
+      btnUploadCover.disabled = false;
+    }
+  });
+
+  btnRemoveCover.addEventListener("click", () => {
+    currentCoverPath = null;
+    coverFileEl.value = "";
+    setCoverPreview(null);
+    setEditStatus("Cover removed (click Save to store this change).");
+  });
+
+  // Upload/remove video
   btnUploadVideo.addEventListener("click", async () => {
     setEditStatus("");
 
@@ -533,6 +626,11 @@
       currentVideoPath = path;
       setVideoPreview(currentVideoPath);
 
+      // ✅ IMPORTANT: when a video is uploaded, clear ARTICLE image so article.html won't show a photo
+      currentImagePath = null;
+      imageFileEl.value = "";
+      setImagePreview(null);
+
       // Insert <video> tag into the editor body automatically
       const { data: pub } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path);
       const url = pub?.publicUrl;
@@ -572,12 +670,10 @@
     }[c]));
   }
 
-  /* ✅ ADDED: normalize editor HTML so it saves like old text (line breaks), but keeps <b>/<i>/<u> */
   function normalizeArticleHtml(html){
     const tmp = document.createElement("div");
     tmp.innerHTML = (html || "");
 
-    // Convert <div>/<p> blocks into inline content + <br>
     tmp.querySelectorAll("div,p").forEach(el => {
       const frag = document.createDocumentFragment();
       while (el.firstChild) frag.appendChild(el.firstChild);
@@ -586,10 +682,7 @@
     });
 
     let out = tmp.innerHTML;
-
-    // Remove trailing breaks
     out = out.replace(/(<br>\s*)+$/i, "");
-
     return out;
   }
 
@@ -603,13 +696,17 @@
     statusEl.value = "draft";
     setEditStatus("");
 
-    // ✅ ADDED: reset image fields
     currentImagePath = null;
     imageAltEl.value = "";
     imageFileEl.value = "";
     setImagePreview(null);
 
-    // ✅ ADDED: reset video fields
+    // ✅ NEW: reset cover fields
+    currentCoverPath = null;
+    coverAltEl.value = "";
+    coverFileEl.value = "";
+    setCoverPreview(null);
+
     currentVideoPath = null;
     videoFileEl.value = "";
     setVideoPreview(null);
@@ -629,12 +726,15 @@
     statusEl.value = a.status || "draft";
     setEditStatus("");
 
-    // ✅ ADDED: load image fields
     currentImagePath = a.image_path || null;
     imageAltEl.value = a.image_alt || "";
     setImagePreview(currentImagePath);
 
-    // ✅ ADDED: reset video preview (videos are stored in the body HTML)
+    // ✅ NEW: load cover fields
+    currentCoverPath = a.cover_image_path || null;
+    coverAltEl.value = a.cover_image_alt || "";
+    setCoverPreview(currentCoverPath);
+
     currentVideoPath = null;
     videoFileEl.value = "";
     setVideoPreview(null);
@@ -647,7 +747,6 @@
 
     const combined = [];
 
-    // ---- Articles ----
     if (ty === "all" || ty === "article") {
       for (const a of articlesCache) {
         const matchesText =
@@ -667,7 +766,6 @@
       }
     }
 
-    // ---- Markets / Bets ----
     if (ty === "all" || ty === "market") {
       for (const m of marketsCache) {
         const matchesText =
@@ -675,7 +773,6 @@
           (m.title || "").toLowerCase().includes(q) ||
           (m.category || "").toLowerCase().includes(q);
 
-        // status filter does not apply to markets, so only show them when status filter is "all"
         const matchesStatus = (st === "all");
 
         if (matchesText && matchesStatus) {
@@ -727,7 +824,6 @@
           mTitleEl.value = m.title || "";
           mCategoryEl.value = m.category || "General";
 
-          // ISO -> datetime-local
           if (m.closes_at) {
             const d = new Date(m.closes_at);
             if (!isNaN(d.getTime())) {
@@ -755,7 +851,7 @@
     setListStatus("Loading…");
     const { data, error } = await supabase
       .from("articles")
-      .select("id,title,slug,excerpt,body,status,image_path,image_alt,created_at,updated_at")
+      .select("id,title,slug,excerpt,body,status,image_path,image_alt,cover_image_path,cover_image_alt,created_at,updated_at")
       .order("updated_at", { ascending: false });
 
     if (error) {
@@ -783,7 +879,6 @@
       return;
     }
 
-    // add a safe updated_at fallback so renderList sorting still works
     marketsCache = (data || []).map(m => ({
       ...m,
       updated_at: m.updated_at ?? m.created_at
@@ -793,8 +888,6 @@
   }
 
   // --- Events ---
-
-  // Toolbar handler (kept)
   document.querySelectorAll(".rte-toolbar [data-cmd]").forEach(btn => {
     btn.addEventListener("click", () => {
       const cmd = btn.getAttribute("data-cmd");
@@ -803,10 +896,6 @@
     });
   });
 
-  /* ✅ ADDED: make editor behave like old textarea:
-     - Enter inserts <br> (not <div>/<p>)
-     - Paste inserts plain text (no formatting garbage)
-  */
   contentEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -830,7 +919,6 @@
   });
 
   titleEl.addEventListener("input", () => {
-    // Only auto-generate slug if creating new or slug is empty
     if (!selectedArticleId && !slugEl.value.trim()) {
       slugEl.value = slugify(titleEl.value);
     }
@@ -891,9 +979,12 @@
     const body = normalizeArticleHtml((contentEl.innerHTML || "")).trim();
     const status = statusEl.value;
 
-    // ✅ ADDED: image fields
     const image_path = currentImagePath;
     const image_alt = (imageAltEl.value || "").trim();
+
+    // ✅ NEW: index-only cover fields
+    const cover_image_path = currentCoverPath;
+    const cover_image_alt = (coverAltEl.value || "").trim();
 
     if (!title) return setEditStatus("Title is required.");
     if (!slug) return setEditStatus("Slug is required.");
@@ -906,7 +997,7 @@
       if (selectedArticleId) {
         const { error } = await supabase
           .from("articles")
-          .update({ title, slug, excerpt, body, status, image_path, image_alt })
+          .update({ title, slug, excerpt, body, status, image_path, image_alt, cover_image_path, cover_image_alt })
           .eq("id", selectedArticleId);
 
         if (error) throw error;
@@ -914,7 +1005,7 @@
       } else {
         const { data, error } = await supabase
           .from("articles")
-          .insert([{ title, slug, excerpt, body, status, image_path, image_alt }])
+          .insert([{ title, slug, excerpt, body, status, image_path, image_alt, cover_image_path, cover_image_alt }])
           .select("id")
           .single();
 
@@ -978,7 +1069,6 @@
   async function createMarket(){
     setMarketStatus("");
 
-    // Require being signed in (matches your admin-only intent)
     const { data: sess } = await supabase.auth.getSession();
     if (!sess?.session?.user) {
       setMarketStatus("You must be signed in to publish a market.");
@@ -1055,7 +1145,6 @@
     setMarketStatus("Deleting…");
 
     try {
-      // delete votes first (handles FK constraints if votes exist)
       const { error: votesErr } = await supabase
         .from("votes")
         .delete()
