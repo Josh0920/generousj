@@ -221,6 +221,15 @@
         <label>Image alt text (recommended)</label>
         <input id="imageAlt" placeholder="Describe the image for accessibility" />
 
+        <!-- ✅ ADDED: Video upload UI -->
+        <label>Video (MP4)</label>
+        <input id="videoFile" type="file" accept="video/mp4,video/webm,video/ogg" />
+        <div class="row" style="margin-top:10px">
+          <button id="btnUploadVideo" type="button">Upload video</button>
+          <button id="btnRemoveVideo" type="button">Remove video</button>
+        </div>
+        <div id="videoPreview" class="status">No video uploaded.</div>
+
         <label>Content</label>
 
         <div class="rte-toolbar" aria-label="Formatting toolbar">
@@ -319,6 +328,13 @@
   const btnRemoveImage = document.getElementById("btnRemoveImage");
   const imagePreviewEl = document.getElementById("imagePreview");
   const imageAltEl = document.getElementById("imageAlt");
+
+  // ✅ ADDED: Video DOM
+  const videoFileEl = document.getElementById("videoFile");
+  const btnUploadVideo = document.getElementById("btnUploadVideo");
+  const btnRemoveVideo = document.getElementById("btnRemoveVideo");
+  const videoPreviewEl = document.getElementById("videoPreview");
+
   // ✅ ADDED: Betting DOM
   const mTitleEl = document.getElementById("m_title");
   const mCategoryEl = document.getElementById("m_category");
@@ -378,6 +394,10 @@
   const IMAGE_BUCKET = "article-images";
   let currentImagePath = null;
 
+  // ✅ ADDED: Video storage settings + state
+  const VIDEO_BUCKET = "article-videos";
+  let currentVideoPath = null;
+
   // ✅ ADDED: Image preview helper
   function setImagePreview(path) {
     if (!path) {
@@ -390,6 +410,23 @@
     imagePreviewEl.innerHTML = url
       ? `<div class="muted" style="margin-bottom:8px">Uploaded ✅</div>
          <img src="${url}" alt="" style="max-width:100%;border:1px solid #ddd;border-radius:12px" />
+         <div class="muted mono" style="margin-top:8px">${path}</div>`
+      : `Uploaded ✅\n${path}`;
+  }
+
+  // ✅ ADDED: Video preview helper
+  function setVideoPreview(path) {
+    if (!path) {
+      videoPreviewEl.textContent = "No video uploaded.";
+      return;
+    }
+
+    const { data } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path);
+    const url = data?.publicUrl;
+
+    videoPreviewEl.innerHTML = url
+      ? `<div class="muted" style="margin-bottom:8px">Uploaded ✅</div>
+         <video controls src="${url}" style="max-width:100%;border:1px solid #ddd;border-radius:12px"></video>
          <div class="muted mono" style="margin-top:8px">${path}</div>`
       : `Uploaded ✅\n${path}`;
   }
@@ -452,6 +489,76 @@
     setEditStatus("Image removed (click Save to store this change).");
   });
 
+  // ✅ ADDED: Upload/remove video events
+  btnUploadVideo.addEventListener("click", async () => {
+    setEditStatus("");
+
+    const file = videoFileEl.files?.[0];
+    if (!file) {
+      setEditStatus("Choose a video file first.");
+      return;
+    }
+
+    const slug = (slugEl.value || "").trim() || slugify(titleEl.value);
+    if (!slug) {
+      setEditStatus("Add a title (or slug) before uploading.");
+      return;
+    }
+
+    btnUploadVideo.disabled = true;
+    setEditStatus("Uploading video…");
+
+    try {
+      const { data: sess, error: sessErr } = await supabase.auth.getSession();
+      if (sessErr) throw sessErr;
+      const userId = sess?.session?.user?.id;
+      if (!userId) throw new Error("Not signed in.");
+
+      const ext = (file.name.split(".").pop() || "mp4")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "") || "mp4";
+
+      const path = `${userId}/${slug}/video-${Date.now()}.${ext}`;
+
+      const { error } = await supabase.storage
+        .from(VIDEO_BUCKET)
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || undefined
+        });
+
+      if (error) throw error;
+
+      currentVideoPath = path;
+      setVideoPreview(currentVideoPath);
+
+      // Insert <video> tag into the editor body automatically
+      const { data: pub } = supabase.storage.from(VIDEO_BUCKET).getPublicUrl(path);
+      const url = pub?.publicUrl;
+
+      if (url) {
+        contentEl.insertAdjacentHTML(
+          "beforeend",
+          `<br><video controls src="${url}"></video><br>`
+        );
+      }
+
+      setEditStatus("Video uploaded ✅ (now click Save to keep the article changes).");
+    } catch (e) {
+      setEditStatus("Video upload error: " + (e?.message ?? String(e)));
+    } finally {
+      btnUploadVideo.disabled = false;
+    }
+  });
+
+  btnRemoveVideo.addEventListener("click", () => {
+    currentVideoPath = null;
+    videoFileEl.value = "";
+    setVideoPreview(null);
+    setEditStatus("Video removed from the editor view (click Save to store this change).");
+  });
+
   // --- State ---
   let currentUser = null;
   let selectedArticleId = null;
@@ -501,6 +608,11 @@
     imageAltEl.value = "";
     imageFileEl.value = "";
     setImagePreview(null);
+
+    // ✅ ADDED: reset video fields
+    currentVideoPath = null;
+    videoFileEl.value = "";
+    setVideoPreview(null);
   }
 
   function fillEditor(a){
@@ -521,6 +633,11 @@
     currentImagePath = a.image_path || null;
     imageAltEl.value = a.image_alt || "";
     setImagePreview(currentImagePath);
+
+    // ✅ ADDED: reset video preview (videos are stored in the body HTML)
+    currentVideoPath = null;
+    videoFileEl.value = "";
+    setVideoPreview(null);
   }
 
   function renderList(){
@@ -538,7 +655,6 @@
           (a.title || "").toLowerCase().includes(q) ||
           (a.slug || "").toLowerCase().includes(q);
 
-        /* ✅ FIXED: status filter actually applies to articles */
         const matchesStatus = (st === "all") || ((a.status || "draft") === st);
 
         if (matchesText && matchesStatus) {
@@ -698,7 +814,6 @@
     }
   });
 
-  /* ✅ FIXED: allow pasting iframe embeds (videos), otherwise keep plain-text paste */
   contentEl.addEventListener("paste", (e) => {
     e.preventDefault();
 
@@ -706,13 +821,11 @@
     const html = cd ? (cd.getData("text/html") || "") : "";
     const text = cd ? (cd.getData("text/plain") || "") : "";
 
-    // Allow iframe embeds (YouTube/Vimeo) to be pasted as HTML
-    if (html && /<iframe[\s>]/i.test(html)) {
+    if (html && (/<iframe[\s>]/i.test(html) || /<video[\s>]/i.test(html) || /<source[\s>]/i.test(html))) {
       document.execCommand("insertHTML", false, html);
       return;
     }
 
-    // Default: paste as plain text
     document.execCommand("insertText", false, text);
   });
 
