@@ -306,8 +306,8 @@
         img.src = "";
       }
 
-      /* ✅ CHANGED: linkify + line breaks */
-      document.getElementById("body").innerHTML = autoLinkTextToHtml(data.body || "");
+      /* ✅ CHANGED: render stored HTML so bold/italic/underline work */
+      document.getElementById("body").innerHTML = (data.body || "");
 
       await loadComments();
     }
