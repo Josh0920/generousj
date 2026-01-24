@@ -33,7 +33,26 @@
       height:100%;
       border:0;
     }
+/* ===== iPhone / mobile video sizing FIX ===== */
 
+/* Ensure media never exceeds article width */
+.body iframe,
+.body video{
+  max-width:100% !important;
+}
+
+/* Safari needs explicit sizing for <video> */
+.body video{
+  display:block;
+  width:100% !important;
+  height:auto !important;
+}
+
+/* Prevent overflow bugs on iOS */
+.embed,
+.body video{
+  overflow:hidden;
+}
     /* --- Engagement (comments only) --- */
     .engage{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     .engage h3{margin:0 0 10px;font-size:14px;color:#111}
@@ -135,18 +154,22 @@
     }
 
     // Wrap iframes in a responsive container
-    function makeEmbedsResponsive(root){
-      const iframes = root.querySelectorAll("iframe");
-      iframes.forEach(iframe => {
-        if (iframe.parentElement && iframe.parentElement.classList.contains("embed")) return;
-        iframe.removeAttribute("width");
-        iframe.removeAttribute("height");
-        const wrap = document.createElement("div");
-        wrap.className = "embed";
-        iframe.parentNode.insertBefore(wrap, iframe);
-        wrap.appendChild(iframe);
-      });
-    }
+    // Wrap iframes + videos in a responsive container (FIX iOS sizing)
+function makeEmbedsResponsive(root){
+  const nodes = root.querySelectorAll("iframe, video");
+
+  nodes.forEach(el => {
+    if (el.parentElement && el.parentElement.classList.contains("embed")) return;
+
+    el.removeAttribute("width");
+    el.removeAttribute("height");
+
+    const wrap = document.createElement("div");
+    wrap.className = "embed";
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+  });
+}
 
     // Linkify URLs inside existing HTML without breaking <b>/<i>/<u>
     function linkifyHtmlPreserve(html){
