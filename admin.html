@@ -294,6 +294,39 @@
 
   <div class="status" id="m_status"></div>
 </div>
+
+<!-- RIGHT: LIVE (SEPARATE) -->
+<div class="card">
+  <h2>Live</h2>
+
+  <label>Topic (optional)</label>
+  <input id="live_topic" placeholder="Breaking / Campus / Politics / etc." />
+
+  <label>Title</label>
+  <input id="live_title" placeholder="Short headline" />
+
+  <label>Body</label>
+  <textarea id="live_body" style="min-height:140px;"></textarea>
+
+  <label>Status</label>
+  <select id="live_status">
+    <option value="draft">Draft</option>
+    <option value="published">Published</option>
+  </select>
+
+  <div class="row" style="margin-top:12px">
+    <button id="live_publish" class="primary" type="button">Publish Update</button>
+    <button id="live_delete" class="danger" type="button">Delete</button>
+    <button id="live_clear" type="button">Clear</button>
+  </div>
+
+  <div class="status" id="live_statusText"></div>
+
+  <div style="height:12px"></div>
+  <div class="muted" style="font-size:12px; margin-bottom:8px;">Recent live updates</div>
+  <div class="list" id="live_list"></div>
+</div>
+
     </div>
   </div>
 
@@ -363,10 +396,22 @@
   const mClearBtn = document.getElementById("m_clear");
   const mStatusEl = document.getElementById("m_status");
 
+  // ✅ Live DOM (separate)
+  const liveTopicEl = document.getElementById("live_topic");
+  const liveTitleEl = document.getElementById("live_title");
+  const liveBodyEl = document.getElementById("live_body");
+  const liveStatusEl = document.getElementById("live_status");
+  const livePublishBtn = document.getElementById("live_publish");
+  const liveDeleteBtn = document.getElementById("live_delete");
+  const liveClearBtn = document.getElementById("live_clear");
+  const liveStatusTextEl = document.getElementById("live_statusText");
+  const liveListEl = document.getElementById("live_list");
+
   const setMarketStatus = (m="") => (mStatusEl.textContent = m);
   const setLoginStatus = (m="") => (loginStatus.textContent = m);
   const setListStatus  = (m="") => (listStatusEl.textContent = m);
   const setEditStatus  = (m="") => (editStatusEl.textContent = m);
+  const setLiveStatus  = (m="") => (liveStatusTextEl.textContent = m);
 
   // --- Helpers ---
   function slugify(str){
@@ -664,6 +709,10 @@
   let marketsCache = [];
   let selectedMarketId = null;
 
+  // ✅ NEW: Live state (separate)
+  let liveCache = [];
+  let selectedLiveId = null;
+
   function escapeHtml(s){
     return (s ?? "").replace(/[&<>"']/g, c => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -887,6 +936,158 @@
     renderList();
   }
 
+  // ✅ NEW: Live (separate from articles/markets list)
+  function clearLiveForm(){
+    selectedLiveId = null;
+    if (liveTopicEl) liveTopicEl.value = "";
+    if (liveTitleEl) liveTitleEl.value = "";
+    if (liveBodyEl) liveBodyEl.value = "";
+    if (liveStatusEl) liveStatusEl.value = "draft";
+    if (livePublishBtn) livePublishBtn.textContent = "Publish Update";
+    setLiveStatus("");
+  }
+
+  function renderLiveList(){
+    if(!liveListEl) return;
+
+    liveListEl.innerHTML = "";
+    if(!liveCache.length){
+      liveListEl.innerHTML = `<div class="muted" style="padding:10px">No live updates yet.</div>`;
+      return;
+    }
+
+    liveCache.forEach(u => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <div style="font-weight:650">${escapeHtml(u.title || "(untitled)")}
+          <span class="pill">${escapeHtml(u.status || "draft")}</span>
+        </div>
+        <div class="muted" style="font-size:12px; margin-top:6px;">
+          ${escapeHtml(u.topic || "—")} • ${new Date(u.created_at).toLocaleString()}
+        </div>
+      `;
+
+      div.addEventListener("click", () => {
+        selectedLiveId = u.id;
+        if (liveTopicEl) liveTopicEl.value = u.topic || "";
+        if (liveTitleEl) liveTitleEl.value = u.title || "";
+        if (liveBodyEl) liveBodyEl.value = u.body || "";
+        if (liveStatusEl) liveStatusEl.value = u.status || "draft";
+        if (livePublishBtn) livePublishBtn.textContent = "Update";
+        setLiveStatus("Loaded ✅");
+      });
+
+      liveListEl.appendChild(div);
+    });
+  }
+
+  async function loadLiveUpdates(){
+    const { data, error } = await supabase
+      .from("live_updates")
+      .select("id,title,body,topic,status,created_at")
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if(error){
+      setLiveStatus("Load error: " + error.message);
+      liveCache = [];
+      renderLiveList();
+      return;
+    }
+
+    liveCache = data || [];
+    renderLiveList();
+  }
+
+  async function saveLiveUpdate(){
+    setLiveStatus("");
+
+    const { data: sess } = await supabase.auth.getSession();
+    if(!sess?.session?.user){
+      setLiveStatus("You must be signed in.");
+      return;
+    }
+
+    const payload = {
+      topic: (liveTopicEl?.value || "").trim(),
+      title: (liveTitleEl?.value || "").trim(),
+      body:  (liveBodyEl?.value || "").trim(),
+      status: (liveStatusEl?.value || "draft").trim()
+    };
+
+    if(!payload.title) return setLiveStatus("Title is required.");
+    if(!payload.body)  return setLiveStatus("Body is required.");
+
+    livePublishBtn.disabled = true;
+    setLiveStatus(selectedLiveId ? "Updating…" : "Publishing…");
+
+    try{
+      if(selectedLiveId){
+        const { error } = await supabase
+          .from("live_updates")
+          .update(payload)
+          .eq("id", selectedLiveId);
+
+        if(error) throw error;
+        setLiveStatus("Updated ✅");
+      } else {
+        const { data, error } = await supabase
+          .from("live_updates")
+          .insert([payload])
+          .select("id")
+          .single();
+
+        if(error) throw error;
+        selectedLiveId = data?.id ?? null;
+        if (livePublishBtn) livePublishBtn.textContent = "Update";
+        setLiveStatus("Published ✅");
+      }
+
+      await loadLiveUpdates();
+    } catch(e){
+      setLiveStatus("Save error: " + (e?.message ?? String(e)));
+    } finally {
+      livePublishBtn.disabled = false;
+    }
+  }
+
+  async function deleteLiveUpdate(){
+    setLiveStatus("");
+
+    if(!selectedLiveId){
+      setLiveStatus("Select a live update first.");
+      return;
+    }
+
+    const ok = confirm("Delete this live update? This cannot be undone.");
+    if(!ok) return;
+
+    liveDeleteBtn.disabled = true;
+    setLiveStatus("Deleting…");
+
+    try{
+      const { error } = await supabase
+        .from("live_updates")
+        .delete()
+        .eq("id", selectedLiveId);
+
+      if(error) throw error;
+
+      clearLiveForm();
+      setLiveStatus("Deleted ✅");
+      await loadLiveUpdates();
+    } catch(e){
+      setLiveStatus("Delete error: " + (e?.message ?? String(e)));
+    } finally {
+      liveDeleteBtn.disabled = false;
+    }
+  }
+
+  livePublishBtn?.addEventListener("click", saveLiveUpdate);
+  liveDeleteBtn?.addEventListener("click", deleteLiveUpdate);
+  liveClearBtn?.addEventListener("click", clearLiveForm);
+
   // --- Events ---
   document.querySelectorAll(".rte-toolbar [data-cmd]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -962,6 +1163,7 @@
     clearEditor();
     await loadArticles();
     await loadMarkets();
+    await loadLiveUpdates();
   });
 
   btnSignOut.addEventListener("click", async () => {
@@ -1183,6 +1385,7 @@
     clearEditor();
     await loadArticles();
     await loadMarkets();
+    await loadLiveUpdates();
   } else {
     showLoggedOutUI();
   }
