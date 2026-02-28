@@ -687,7 +687,7 @@ async function loadHomepageBetting(){
 
       const { data, error } = await sb
   .from("live_updates")
-  .select("title, body, topic, slug, created_at")
+  .select("title, body, topic, created_at")
   .order("created_at", { ascending: false })
   .limit(4);
 
@@ -708,8 +708,6 @@ async function loadHomepageBetting(){
       box.innerHTML = data.map(u => {
         const when = formatTime(u.created_at);
         const topic = u.topic ? `<span style="font-weight:700;">${escapeHtml(u.topic)}</span> • ` : "";
-        const linkOpen = u.slug ? `<a href="article.html?slug=${encodeURIComponent(u.slug)}">` : "";
-        const linkClose = u.slug ? `</a>` : "";
 
         return `
           <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
@@ -717,7 +715,7 @@ async function loadHomepageBetting(){
               ${topic}${escapeHtml(when)}
             </div>
             <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
-              ${linkOpen}${escapeHtml(u.title)}${linkClose}
+              ${escapeHtml(u.title)}
             </div>
             <div style="margin-top:6px; font-size:14px; color:#222;">
               ${escapeHtml(u.body)}
