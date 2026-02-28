@@ -302,11 +302,11 @@
     /* Responsive */
     @media (max-width: 1020px){
       .grid{ grid-template-columns: 1fr 2fr; }
-      /* ✅ IMPORTANT: do NOT hide rightRail on smaller screens */
+      /* ✅ show rightRail (Live/Betting) on smaller screens */
       .rightRail{
         display:block;
         grid-column: 1 / -1;
-        margin-top: 18px;
+        margin-top:18px;
       }
       .brand .name{ font-size:40px; }
     }
@@ -317,7 +317,13 @@
         text-align:center;
       }
       .masthead .tools{ justify-content:center; flex-wrap:wrap; }
-      .grid{ grid-template-columns: 1fr; }
+
+      /* ✅ Stack everything in a controlled order */
+      .grid{
+        display:flex;
+        flex-direction:column;
+      }
+
       .lead .headline{ font-size:28px; }
       .subgrid{ grid-template-columns: 1fr; }
       footer .cols{ grid-template-columns: 1fr 1fr; }
@@ -336,14 +342,15 @@
         padding:6px 0;
       }
 
-      /* ✅ Topbar: allow wrapping so it doesn't crush */
+      /* ✅ Topbar: allow wrapping */
       .topbar .row{ flex-wrap:wrap; justify-content:center; }
       .topbar .left, .topbar .right{ flex-wrap:wrap; justify-content:center; }
 
-      /* 🔽 MOBILE ORDER FIX */
-      .center{ order: 1; }     /* Lead Story */
-      .leftRail{ order: 2; }   /* Top Stories */
-      .rightRail{ order: 3; }  /* Live + Betting */
+      /* 🔽 MOBILE ORDER: Live above Top Stories */
+      .liveModule{ order: 1; }
+      .center{ order: 2; }     /* Lead Story */
+      .leftRail{ order: 3; }   /* Top Stories */
+      .bettingModule{ order: 4; }
     }
   </style>
 </head>
@@ -433,14 +440,14 @@
         <!-- Right column -->
         <aside class="rightRail">
 
-          <div class="module">
+          <div class="module liveModule">
             <h3><a href="live.html">Live</a></h3>
             <div class="muted" id="live-module" style="margin:0;">No live updates yet.</div>
           </div>
 
           <div style="height:14px"></div>
 
-          <div class="module">
+          <div class="module bettingModule">
             <div class="sectionhead" style="margin-bottom:10px;">
               <h3 style="margin:0; text-transform:none; letter-spacing:0;">Latest Betting</h3>
               <a class="viewall" href="betting.html">View all →</a>
@@ -545,7 +552,7 @@
       const leadStory = data[0];
       const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
 
-      // ✅ NEW: turn storage path into a real URL
+      // ✅ turn storage path into a real URL
       let leadImgHtml = "";
       const leadCardPath = leadStory.cover_image_path || leadStory.image_path;
       const leadCardAlt  = leadStory.cover_image_alt || leadStory.image_alt || "";
@@ -635,7 +642,6 @@
         return `${hrs}h`;
       };
 
-      // Pull the newest 3 markets (change to .order("closes_at") if you want "closing soon")
       const { data, error } = await sb
         .from("markets")
         .select("id,title,category,closes_at,created_at,yes_votes,no_votes")
@@ -656,25 +662,34 @@
       box.classList.remove("muted");
       box.style.margin = "0";
 
-      box.innerHTML = data.map(u => {
-  const when = formatTime(u.created_at);
-  const topic = u.topic ? `<span style="font-weight:700;">${escapeHtml(u.topic)}</span> • ` : "";
+      box.innerHTML = data.map(m => {
+        const y = m.yes_votes || 0;
+        const n = m.no_votes || 0;
+        const p = pct(y, n);
 
-  return `
-    <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
-      <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-bottom:6px;">
-        ${topic}${escapeHtml(when)}
-      </div>
-      <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
-        ${escapeHtml(u.title)}
-      </div>
-    </div>
-  `;
-}).join("");
+        return `
+          <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
+            <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
+              ${escapeHtml(m.title)}
+            </div>
+            <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:6px;">
+              <span>${escapeHtml(m.category || "General")}</span>
+              <span> • </span>
+              <span>YES ${p.yes}%</span>
+              <span> • </span>
+              <span>${p.t} votes</span>
+              <span> • </span>
+              <span>Ends in ${fmtEnds(m.closes_at)}</span>
+            </div>
+            <div style="height:8px; border:1px solid #eee; border-radius:999px; overflow:hidden; background:#f3f3f3; margin-top:8px;">
+              <div style="height:100%; width:${p.yes}%; background:#111;"></div>
+            </div>
+          </div>
+        `;
+      }).join("") + `<div style="padding-top:10px;">
         <a class="btn" href="betting.html" style="display:inline-block;">Open Betting →</a>
       </div>`;
 
-      // remove last border
       const kids = box.querySelectorAll("div[style*='border-bottom']");
       if(kids.length) kids[kids.length - 1].style.borderBottom = "none";
     }
@@ -718,6 +733,7 @@
       box.classList.remove("muted");
       box.style.margin = "0";
 
+      /* ✅ TITLE ONLY (no full body on homepage) */
       box.innerHTML = data.map(u => {
         const when = formatTime(u.created_at);
         const topic = u.topic ? `<span style="font-weight:700;">${escapeHtml(u.topic)}</span> • ` : "";
@@ -729,9 +745,6 @@
             </div>
             <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
               ${escapeHtml(u.title)}
-            </div>
-            <div style="margin-top:6px; font-size:14px; color:#222;">
-              ${escapeHtml(u.body)}
             </div>
           </div>
         `;
