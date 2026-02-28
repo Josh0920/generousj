@@ -126,6 +126,62 @@
       content: attr(data-placeholder);
       color: #999;
     }
+
+    /* ✅ NEW: top dropdown panels */
+    .topPanels{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:16px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .topPanels{grid-template-columns:1fr}
+    }
+    details.drop{
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:#fff;
+      overflow:hidden;
+    }
+    details.drop > summary{
+      list-style:none;
+      cursor:pointer;
+      padding:14px;
+      font-weight:700;
+      letter-spacing:-0.01em;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      user-select:none;
+    }
+    details.drop > summary::-webkit-details-marker{display:none}
+    details.drop > summary .hint{
+      font-weight:600;
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:0;
+    }
+    details.drop[open] > summary{
+      border-bottom:1px solid var(--border);
+    }
+    details.drop .card{
+      border:none;
+      border-radius:0;
+      padding:14px;
+    }
+    /* Hide the internal card h2 since summary is the "tab" */
+    details.drop .card > h2:first-child{display:none}
+
+    /* ✅ NEW: "View all" button row */
+    .listTopBar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-top:10px;
+    }
+    .listTopBar .muted{font-size:12px}
+    .listTopBar button{padding:8px 10px}
   </style>
 </head>
 <body>
@@ -160,172 +216,204 @@
 
   <!-- DASHBOARD -->
   <div id="dash" class="hidden">
-    <div class="grid">
 
-      <!-- LEFT: LIST -->
-      <div class="card">
-       <h2>Your content</h2>
-<div class="row">
-  <input id="search" placeholder="Search…" />
+    <!-- ✅ NEW: Dropdown "tabs" row -->
+    <div class="topPanels">
 
-  <select id="filterType" style="max-width:160px">
-    <option value="all" selected>All</option>
-    <option value="article">Articles</option>
-    <option value="market">Bets</option>
-  </select>
+      <!-- YOUR CONTENT -->
+      <details class="drop" open>
+        <summary>
+          <span>Your content</span>
+          <span class="hint">Latest 3 + filters</span>
+        </summary>
+        <div class="card">
+          <h2>Your content</h2>
+          <div class="row">
+            <input id="search" placeholder="Search…" />
 
-  <select id="filterStatus" style="max-width:160px">
-    <option value="all">All</option>
-    <option value="draft">Draft</option>
-    <option value="published">Published</option>
-  </select>
-</div>
+            <select id="filterType" style="max-width:160px">
+              <option value="all" selected>All</option>
+              <option value="article">Articles</option>
+              <option value="market">Bets</option>
+            </select>
 
-<div class="list" id="articleList"></div>
-        <div class="status" id="listStatus"></div>
-      </div>
-
-      <!-- RIGHT: EDITOR -->
-      <div class="card">
-        <h2 id="editorTitle">Editor</h2>
-
-        <label>Title</label>
-        <input id="title" placeholder="Article title" />
-
-        <div class="row">
-          <div>
-            <label>Slug (URL-friendly)</label>
-            <input id="slug" class="mono" placeholder="my-article-title" />
-          </div>
-          <div style="max-width:220px">
-            <label>Status</label>
-            <select id="status">
+            <select id="filterStatus" style="max-width:160px">
+              <option value="all">All</option>
               <option value="draft">Draft</option>
               <option value="published">Published</option>
             </select>
           </div>
+
+          <!-- ✅ NEW: View all toggle -->
+          <div class="listTopBar">
+            <div class="muted" id="listHint"></div>
+            <button id="btnViewAll" type="button">View all</button>
+          </div>
+
+          <div class="list" id="articleList"></div>
+          <div class="status" id="listStatus"></div>
         </div>
+      </details>
 
-        <label>Excerpt</label>
-        <input id="excerpt" placeholder="1–2 sentence summary (optional)" />
+      <!-- EDITOR -->
+      <details class="drop" open>
+        <summary>
+          <span>Editor (new)</span>
+          <span class="hint">Articles</span>
+        </summary>
+        <div class="card">
+          <h2 id="editorTitle">Editor</h2>
 
-        <!-- ✅ Cover image upload UI (this is ARTICLE image) -->
-        <label>Cover image</label>
-        <input id="imageFile" type="file" accept="image/*" />
-        <div class="row" style="margin-top:10px">
-          <button id="btnUploadImage" type="button">Upload image</button>
-          <button id="btnRemoveImage" type="button">Remove image</button>
+          <label>Title</label>
+          <input id="title" placeholder="Article title" />
+
+          <div class="row">
+            <div>
+              <label>Slug (URL-friendly)</label>
+              <input id="slug" class="mono" placeholder="my-article-title" />
+            </div>
+            <div style="max-width:220px">
+              <label>Status</label>
+              <select id="status">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Excerpt</label>
+          <input id="excerpt" placeholder="1–2 sentence summary (optional)" />
+
+          <!-- ✅ Cover image upload UI (this is ARTICLE image) -->
+          <label>Cover image</label>
+          <input id="imageFile" type="file" accept="image/*" />
+          <div class="row" style="margin-top:10px">
+            <button id="btnUploadImage" type="button">Upload image</button>
+            <button id="btnRemoveImage" type="button">Remove image</button>
+          </div>
+          <div id="imagePreview" class="status">No image uploaded.</div>
+
+          <label>Image alt text (recommended)</label>
+          <input id="imageAlt" placeholder="Describe the image for accessibility" />
+
+          <!-- ✅ NEW: INDEX-ONLY cover image -->
+          <label>Cover image (index only)</label>
+          <input id="coverFile" type="file" accept="image/*" />
+          <div class="row" style="margin-top:10px">
+            <button id="btnUploadCover" type="button">Upload cover</button>
+            <button id="btnRemoveCover" type="button">Remove cover</button>
+          </div>
+          <div id="coverPreview" class="status">No cover uploaded.</div>
+
+          <label>Cover alt text (index only)</label>
+          <input id="coverAlt" placeholder="Describe the cover image for accessibility" />
+
+          <!-- ✅ Video upload UI -->
+          <label>Video (MP4)</label>
+          <input id="videoFile" type="file" accept="video/mp4,video/webm,video/ogg" />
+          <div class="row" style="margin-top:10px">
+            <button id="btnUploadVideo" type="button">Upload video</button>
+            <button id="btnRemoveVideo" type="button">Remove video</button>
+          </div>
+          <div id="videoPreview" class="status">No video uploaded.</div>
+
+          <label>Content</label>
+
+          <div class="rte-toolbar" aria-label="Formatting toolbar">
+            <button type="button" data-cmd="bold"><b>B</b></button>
+            <button type="button" data-cmd="italic"><i>I</i></button>
+            <button type="button" data-cmd="underline"><u>U</u></button>
+          </div>
+
+          <div id="content" class="rte" contenteditable="true" data-placeholder="Start writing…"></div>
+
+          <div class="row" style="margin-top:12px">
+            <button id="btnSave" class="primary">Save</button>
+            <button id="btnDelete" class="danger">Delete</button>
+          </div>
+
+          <div class="status" id="editStatus"></div>
         </div>
-        <div id="imagePreview" class="status">No image uploaded.</div>
+      </details>
 
-        <label>Image alt text (recommended)</label>
-        <input id="imageAlt" placeholder="Describe the image for accessibility" />
+      <!-- BETTING / MARKETS -->
+      <details class="drop">
+        <summary>
+          <span>Betting (markets)</span>
+          <span class="hint">Questions</span>
+        </summary>
+        <div class="card">
+          <h2>Betting (Markets)</h2>
 
-        <!-- ✅ NEW: INDEX-ONLY cover image -->
-        <label>Cover image (index only)</label>
-        <input id="coverFile" type="file" accept="image/*" />
-        <div class="row" style="margin-top:10px">
-          <button id="btnUploadCover" type="button">Upload cover</button>
-          <button id="btnRemoveCover" type="button">Remove cover</button>
+          <label>Question / Title</label>
+          <input id="m_title" placeholder="Will ____ happen by ____?" />
+
+          <div class="row">
+            <div>
+              <label>Category</label>
+              <select id="m_category">
+                <option value="General" selected>General</option>
+                <option value="Politics">Politics</option>
+                <option value="Sports">Sports</option>
+                <option value="Campus">Campus</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="World">World</option>
+              </select>
+            </div>
+
+            <div style="max-width:260px">
+              <label>Closes at</label>
+              <input id="m_closes" type="datetime-local" />
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <button id="m_create" class="primary" type="button">Publish Market</button>
+            <button id="m_delete" class="danger" type="button">Delete Market</button>
+            <button id="m_clear" type="button">Clear</button>
+          </div>
+
+          <div class="status" id="m_status"></div>
         </div>
-        <div id="coverPreview" class="status">No cover uploaded.</div>
+      </details>
 
-        <label>Cover alt text (index only)</label>
-        <input id="coverAlt" placeholder="Describe the cover image for accessibility" />
+      <!-- LIVE -->
+      <details class="drop">
+        <summary>
+          <span>Live</span>
+          <span class="hint">Updates</span>
+        </summary>
+        <div class="card">
+          <h2>Live</h2>
 
-        <!-- ✅ Video upload UI -->
-        <label>Video (MP4)</label>
-        <input id="videoFile" type="file" accept="video/mp4,video/webm,video/ogg" />
-        <div class="row" style="margin-top:10px">
-          <button id="btnUploadVideo" type="button">Upload video</button>
-          <button id="btnRemoveVideo" type="button">Remove video</button>
+          <label>Topic (optional)</label>
+          <input id="live_topic" placeholder="Breaking / Campus / Politics / etc." />
+
+          <label>Title</label>
+          <input id="live_title" placeholder="Short headline" />
+
+          <label>Body</label>
+          <textarea id="live_body" style="min-height:140px;"></textarea>
+
+          <label>Status</label>
+          <select id="live_status">
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+          </select>
+
+          <div class="row" style="margin-top:12px">
+            <button id="live_publish" class="primary" type="button">Publish Update</button>
+            <button id="live_delete" class="danger" type="button">Delete</button>
+            <button id="live_clear" type="button">Clear</button>
+          </div>
+
+          <div class="status" id="live_statusText"></div>
+
+          <div style="height:12px"></div>
+          <div class="muted" style="font-size:12px; margin-bottom:8px;">Recent live updates</div>
+          <div class="list" id="live_list"></div>
         </div>
-        <div id="videoPreview" class="status">No video uploaded.</div>
-
-        <label>Content</label>
-
-        <div class="rte-toolbar" aria-label="Formatting toolbar">
-          <button type="button" data-cmd="bold"><b>B</b></button>
-          <button type="button" data-cmd="italic"><i>I</i></button>
-          <button type="button" data-cmd="underline"><u>U</u></button>
-        </div>
-
-        <div id="content" class="rte" contenteditable="true" data-placeholder="Start writing…"></div>
-
-        <div class="row" style="margin-top:12px">
-          <button id="btnSave" class="primary">Save</button>
-          <button id="btnDelete" class="danger">Delete</button>
-        </div>
-
-        <div class="status" id="editStatus"></div>
-      </div>
-
-<!-- RIGHT: BETTING / MARKETS -->
-<div class="card">
-  <h2>Betting (Markets)</h2>
-
-  <label>Question / Title</label>
-  <input id="m_title" placeholder="Will ____ happen by ____?" />
-
-  <div class="row">
-    <div>
-      <label>Category</label>
-      <select id="m_category">
-        <option value="General" selected>General</option>
-        <option value="Politics">Politics</option>
-        <option value="Sports">Sports</option>
-        <option value="Campus">Campus</option>
-        <option value="Entertainment">Entertainment</option>
-        <option value="World">World</option>
-      </select>
-    </div>
-
-    <div style="max-width:260px">
-      <label>Closes at</label>
-      <input id="m_closes" type="datetime-local" />
-    </div>
-  </div>
-
- <div class="row" style="margin-top:12px">
-  <button id="m_create" class="primary" type="button">Publish Market</button>
-  <button id="m_delete" class="danger" type="button">Delete Market</button>
-  <button id="m_clear" type="button">Clear</button>
-</div>
-
-  <div class="status" id="m_status"></div>
-</div>
-
-<!-- RIGHT: LIVE (SEPARATE) -->
-<div class="card">
-  <h2>Live</h2>
-
-  <label>Topic (optional)</label>
-  <input id="live_topic" placeholder="Breaking / Campus / Politics / etc." />
-
-  <label>Title</label>
-  <input id="live_title" placeholder="Short headline" />
-
-  <label>Body</label>
-  <textarea id="live_body" style="min-height:140px;"></textarea>
-
-  <label>Status</label>
-  <select id="live_status">
-    <option value="draft">Draft</option>
-    <option value="published">Published</option>
-  </select>
-
-  <div class="row" style="margin-top:12px">
-    <button id="live_publish" class="primary" type="button">Publish Update</button>
-    <button id="live_delete" class="danger" type="button">Delete</button>
-    <button id="live_clear" type="button">Clear</button>
-  </div>
-
-  <div class="status" id="live_statusText"></div>
-
-  <div style="height:12px"></div>
-  <div class="muted" style="font-size:12px; margin-bottom:8px;">Recent live updates</div>
-  <div class="list" id="live_list"></div>
-</div>
+      </details>
 
     </div>
   </div>
@@ -356,6 +444,10 @@
   const filterTypeEl = document.getElementById("filterType");
   const articleListEl = document.getElementById("articleList");
   const listStatusEl = document.getElementById("listStatus");
+
+  // ✅ NEW: view all toggle
+  const btnViewAll = document.getElementById("btnViewAll");
+  const listHintEl = document.getElementById("listHint");
 
   const editorTitleEl = document.getElementById("editorTitle");
   const titleEl = document.getElementById("title");
@@ -412,6 +504,9 @@
   const setListStatus  = (m="") => (listStatusEl.textContent = m);
   const setEditStatus  = (m="") => (editStatusEl.textContent = m);
   const setLiveStatus  = (m="") => (liveStatusTextEl.textContent = m);
+
+  // ✅ NEW: list state
+  let listShowAll = false;
 
   // --- Helpers ---
   function slugify(str){
@@ -836,13 +931,28 @@
 
     combined.sort((x, y) => new Date(y.sortDate) - new Date(x.sortDate));
 
+    // ✅ NEW: show only latest 3 by default (when no filters/search)
+    const isDefaultView = (!q && st === "all" && ty === "all");
+    const shouldLimit = isDefaultView && !listShowAll;
+    const toShow = shouldLimit ? combined.slice(0, 3) : combined;
+
+    if (listHintEl) {
+      if (!combined.length) listHintEl.textContent = "";
+      else if (shouldLimit) listHintEl.textContent = "Showing latest 3";
+      else listHintEl.textContent = `Showing ${toShow.length} of ${combined.length}`;
+    }
+    if (btnViewAll) {
+      btnViewAll.classList.toggle("hidden", !isDefaultView && !combined.length);
+      btnViewAll.textContent = (isDefaultView && listShowAll) ? "Show less" : "View all";
+    }
+
     articleListEl.innerHTML = "";
-    if (!combined.length) {
+    if (!toShow.length) {
       articleListEl.innerHTML = `<div class="muted" style="padding:10px">No results.</div>`;
       return;
     }
 
-    for (const item of combined) {
+    for (const item of toShow) {
       const div = document.createElement("div");
       div.className = "item";
 
@@ -1130,9 +1240,27 @@
     titleEl.focus();
   });
 
-  searchEl.addEventListener("input", renderList);
-  filterStatusEl.addEventListener("change", renderList);
-  filterTypeEl.addEventListener("change", renderList);
+  // ✅ NEW: View all toggle
+  btnViewAll?.addEventListener("click", () => {
+    listShowAll = !listShowAll;
+    renderList();
+  });
+
+  searchEl.addEventListener("input", () => {
+    // if searching, show full results automatically
+    if ((searchEl.value || "").trim()) listShowAll = true;
+    renderList();
+  });
+  filterStatusEl.addEventListener("change", () => {
+    // if filtering, show full results automatically
+    if (filterStatusEl.value !== "all") listShowAll = true;
+    renderList();
+  });
+  filterTypeEl.addEventListener("change", () => {
+    // if filtering, show full results automatically
+    if (filterTypeEl.value !== "all") listShowAll = true;
+    renderList();
+  });
 
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
