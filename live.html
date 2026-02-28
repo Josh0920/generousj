@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Generous J Press — Live</title>
+  <meta name="description" content="The Generous J Press — Live reporting timeline." />
+  <style>
+    :root{
+      --bg:#ffffff;
+      --ink:#0a0a0a;
+      --muted:#5a5a5a;
+      --rule:#e5e5e5;
+      --rule-strong:#cfcfcf;
+      --accent:#c00; /* CNN-ish red accent */
+      --max:1100px;
+      --serif: ui-serif, Georgia, "Times New Roman", Times, serif;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:var(--serif);
+      line-height:1.25;
+    }
+    a{color:inherit;text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    .wrap{max-width:var(--max);margin:0 auto;padding:0 16px}
+
+    /* Top utility bar */
+    .topbar{
+      border-bottom:1px solid var(--rule);
+      font-family:var(--sans);
+      font-size:12px;
+      background:#fff;
+    }
+    .topbar .row{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:8px 0;
+      color:var(--muted);
+    }
+    .pill{
+      border:1px solid var(--rule-strong);
+      padding:4px 8px;border-radius:999px;
+      color:var(--ink);background:#fafafa;
+      display:inline-flex;align-items:center;gap:8px;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:var(--accent);
+      box-shadow:0 0 0 3px rgba(204,0,0,.12);
+      display:inline-block;
+    }
+    .btn{
+      font-family:var(--sans);
+      font-size:12px;
+      border:1px solid var(--rule-strong);
+      padding:6px 10px;
+      border-radius:6px;
+      background:#f8f8f8;
+      cursor:pointer;
+      display:inline-block;
+    }
+    .btn.primary{
+      background:var(--ink);
+      color:#fff;
+      border-color:var(--ink);
+    }
+
+    /* Masthead */
+    header{
+      border-bottom:1px solid var(--rule-strong);
+      background:#fff;
+      position:sticky;
+      top:0;
+      z-index:20;
+    }
+    .mast{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 0;
+    }
+    .brand{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      line-height:1;
+    }
+    .brand .name{
+      font-weight:900;
+      letter-spacing:-.4px;
+      font-size:24px;
+    }
+    .brand .sub{
+      font-family:var(--sans);
+      color:var(--muted);
+      font-size:12px;
+    }
+    .navlinks{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    /* Live header area */
+    .liveHero{
+      padding:18px 0 8px;
+      border-bottom:1px solid var(--rule);
+      background:#fff;
+    }
+    .liveTop{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    .liveTitle{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      min-width:280px;
+    }
+    .badgeRow{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-family:var(--sans);
+    }
+    .liveBadge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-weight:800;
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(204,0,0,.08);
+      border:1px solid rgba(204,0,0,.25);
+      color:var(--accent);
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+    .headline{
+      margin:0;
+      font-size:36px;
+      letter-spacing:-.5px;
+      font-weight:900;
+    }
+    .deck{
+      margin:0;
+      font-size:14px;
+      color:#222;
+      max-width:70ch;
+    }
+    .metaLine{
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+
+    /* Controls */
+    .controls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    .search{
+      font-family:var(--sans);
+      font-size:13px;
+      padding:10px 12px;
+      border:1px solid var(--rule-strong);
+      border-radius:999px;
+      min-width:240px;
+      outline:none;
+    }
+    .chipRow{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:10px;
+      font-family:var(--sans);
+    }
+    .chip{
+      border:1px solid var(--rule-strong);
+      background:#fff;
+      padding:7px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      cursor:pointer;
+      user-select:none;
+    }
+    .chip.active{
+      border-color:var(--ink);
+      color:var(--ink);
+      background:#f8f8f8;
+    }
+
+    /* Layout */
+    main{padding:18px 0 28px}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 320px;
+      gap:18px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+      .rail{display:none}
+      .headline{font-size:30px}
+    }
+
+    /* Timeline */
+    .timeline{
+      position:relative;
+      padding-left:18px;
+    }
+    .timeline:before{
+      content:"";
+      position:absolute;
+      left:6px;
+      top:0;
+      bottom:0;
+      width:2px;
+      background:var(--rule);
+    }
+    .update{
+      position:relative;
+      padding:14px 14px 14px 14px;
+      border:1px solid var(--rule);
+      border-radius:14px;
+      background:#fff;
+      margin-bottom:12px;
+    }
+    .update:before{
+      content:"";
+      position:absolute;
+      left:-18px;
+      top:22px;
+      width:12px;height:12px;border-radius:50%;
+      background:#fff;
+      border:2px solid var(--accent);
+      box-shadow:0 0 0 3px rgba(204,0,0,.10);
+    }
+    .updateTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .uMeta{
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .topicTag{
+      font-weight:800;
+      color:var(--ink);
+    }
+    .uTitle{
+      margin:0 0 6px;
+      font-weight:900;
+      font-size:18px;
+      letter-spacing:-.2px;
+    }
+    .uBody{
+      margin:0;
+      font-size:15px;
+      color:#222;
+      line-height:1.45;
+      white-space:pre-wrap;
+    }
+    .uActions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .linkBtn{
+      border:1px solid var(--rule-strong);
+      border-radius:999px;
+      padding:6px 10px;
+      background:#f8f8f8;
+      cursor:pointer;
+      font-family:var(--sans);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    /* Right rail */
+    .rail{
+      border:1px solid var(--rule);
+      border-radius:14px;
+      background:#fcfcfc;
+      padding:12px;
+      position:sticky;
+      top:86px;
+    }
+    .rail h3{
+      font-family:var(--sans);
+      font-size:12px;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      margin:0 0 10px;
+      color:var(--muted);
+    }
+    .rail .small{
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+      margin:0 0 10px;
+    }
+    .rail .stat{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:8px 0;
+      border-top:1px solid var(--rule);
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+    }
+    .rail .stat strong{color:var(--ink);font-weight:800}
+
+    footer{
+      border-top:1px solid var(--rule-strong);
+      padding:18px 0 28px;
+      color:var(--muted);
+      font-family:var(--sans);
+      font-size:12px;
+      background:#fff;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Utility bar -->
+  <div class="topbar">
+    <div class="wrap">
+      <div class="row">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <span class="pill"><span class="dot"></span><span id="today">Live</span></span>
+          <span>Updated: <span id="time">—</span></span>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <a class="btn" href="index.html">Home</a>
+          <a class="btn primary" href="https://thegenerousjpress.beehiiv.com/subscribe" target="_blank" rel="noopener">Subscribe</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticky masthead -->
+  <header>
+    <div class="wrap">
+      <div class="mast">
+        <a class="brand" href="index.html" aria-label="Back to homepage">
+          <div class="name">The Generous J Press</div>
+          <div class="sub">Live reporting</div>
+        </a>
+
+        <div class="navlinks">
+          <a href="all.html">All</a>
+          <a href="betting.html">Betting</a>
+          <a href="admin.html" rel="nofollow">Editor</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live hero -->
+  <section class="liveHero">
+    <div class="wrap">
+      <div class="liveTop">
+        <div class="liveTitle">
+          <div class="badgeRow">
+            <span class="liveBadge"><span class="dot"></span>Live updates</span>
+            <span class="metaLine"><span id="count">0</span> updates</span>
+          </div>
+          <h1 class="headline">Live reporting</h1>
+          <p class="deck">Real-time updates from The Generous J Press. Newest updates appear at the top.</p>
+          <div class="metaLine">
+            <span>Last update:</span>
+            <strong id="lastUpdate">—</strong>
+          </div>
+        </div>
+
+        <div class="controls">
+          <input id="q" class="search" placeholder="Search live updates…" />
+          <button id="btnRefresh" class="btn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div class="chipRow" id="chips"></div>
+    </div>
+  </section>
+
+  <main>
+    <div class="wrap">
+      <div class="grid">
+        <!-- Main timeline -->
+        <section>
+          <div class="timeline" id="timeline">
+            <div class="muted" style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:10px 0;">
+              Loading…
+            </div>
+          </div>
+        </section>
+
+        <!-- Right rail -->
+        <aside class="rail">
+          <h3>Live</h3>
+          <p class="small">
+            This page updates on refresh. (If you want true realtime auto-updates, tell me and I’ll add it.)
+          </p>
+          <div class="stat">
+            <span>Status</span>
+            <strong id="railStatus">—</strong>
+          </div>
+          <div class="stat">
+            <span>Topic</span>
+            <strong id="railTopic">All</strong>
+          </div>
+          <div class="stat">
+            <span>Showing</span>
+            <strong id="railShowing">0</strong>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      © <span id="year">2026</span> The Generous J Press. All rights reserved.
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://gyfoaukqsgbtcyxnmgvs.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const $ = (id) => document.getElementById(id);
+
+    const timelineEl = $("timeline");
+    const chipsEl = $("chips");
+    const qEl = $("q");
+    const btnRefresh = $("btnRefresh");
+
+    const countEl = $("count");
+    const lastUpdateEl = $("lastUpdate");
+    const railStatusEl = $("railStatus");
+    const railTopicEl = $("railTopic");
+    const railShowingEl = $("railShowing");
+
+    let allUpdates = [];
+    let activeTopic = "All";
+
+    function escapeHtml(s){
+      return String(s || "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function fmtTime(iso){
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "—";
+      return d.toLocaleString(undefined, { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+    }
+
+    function setNowStamp(){
+      const now = new Date();
+      const fmtTime = now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+      $("time").textContent = fmtTime;
+      $("year").textContent = String(now.getFullYear());
+    }
+
+    function buildChips(){
+      const topics = new Map();
+      topics.set("All", allUpdates.length);
+
+      allUpdates.forEach(u => {
+        const t = (u.topic || "").trim();
+        if(!t) return;
+        topics.set(t, (topics.get(t) || 0) + 1);
+      });
+
+      chipsEl.innerHTML = "";
+      for (const [topic, n] of topics.entries()){
+        const chip = document.createElement("div");
+        chip.className = "chip" + (topic === activeTopic ? " active" : "");
+        chip.textContent = topic + (topic === "All" ? "" : ` (${n})`);
+        chip.addEventListener("click", () => {
+          activeTopic = topic;
+          railTopicEl.textContent = topic;
+          buildChips();
+          render();
+        });
+        chipsEl.appendChild(chip);
+      }
+    }
+
+    function filterUpdates(){
+      const q = (qEl.value || "").trim().toLowerCase();
+
+      return allUpdates.filter(u => {
+        const topicOk = (activeTopic === "All") || ((u.topic || "").trim() === activeTopic);
+
+        const text = `${u.title || ""} ${u.body || ""} ${u.topic || ""}`.toLowerCase();
+        const qOk = !q || text.includes(q);
+
+        return topicOk && qOk;
+      });
+    }
+
+    function render(){
+      const rows = filterUpdates();
+      railShowingEl.textContent = String(rows.length);
+
+      timelineEl.innerHTML = "";
+      if(!rows.length){
+        timelineEl.innerHTML = `
+          <div class="muted" style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:10px 0;">
+            No live updates match your filters.
+          </div>
+        `;
+        return;
+      }
+
+      rows.forEach(u => {
+        const topic = (u.topic || "").trim();
+        const when = fmtTime(u.created_at);
+
+        const articleLink = (u.slug || "").trim()
+          ? `<a class="linkBtn" href="article.html?slug=${encodeURIComponent(u.slug)}">Open article →</a>`
+          : "";
+
+        const card = document.createElement("article");
+        card.className = "update";
+        card.innerHTML = `
+          <div class="updateTop">
+            <div class="uMeta">
+              ${topic ? `<span class="topicTag">${escapeHtml(topic)}</span><span>•</span>` : ``}
+              <span>${escapeHtml(when)}</span>
+            </div>
+            <div class="uActions">
+              ${articleLink}
+            </div>
+          </div>
+          <h2 class="uTitle">${escapeHtml(u.title || "")}</h2>
+          <p class="uBody">${escapeHtml(u.body || "")}</p>
+        `;
+        timelineEl.appendChild(card);
+      });
+    }
+
+    async function loadLive(){
+      railStatusEl.textContent = "Loading…";
+
+      const { data, error } = await sb
+        .from("live_updates")
+        .select("title, body, topic, slug, status, created_at")
+        .eq("status","published")
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if(error){
+        console.error(error);
+        railStatusEl.textContent = "Error";
+        timelineEl.innerHTML = `
+          <div class="muted" style="font-family:var(--sans);font-size:12px;color:var(--muted);padding:10px 0;">
+            Failed to load live updates.
+          </div>
+        `;
+        return;
+      }
+
+      allUpdates = data || [];
+      countEl.textContent = String(allUpdates.length);
+
+      const latest = allUpdates[0]?.created_at;
+      lastUpdateEl.textContent = latest ? fmtTime(latest) : "—";
+
+      railStatusEl.textContent = "Live";
+      buildChips();
+      render();
+      setNowStamp();
+    }
+
+    qEl.addEventListener("input", render);
+    btnRefresh.addEventListener("click", loadLive);
+
+    setNowStamp();
+    loadLive();
+  </script>
+</body>
+</html>
