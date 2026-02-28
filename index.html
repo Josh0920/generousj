@@ -639,10 +639,8 @@ async function loadHomepageBetting(){
         return `
           <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
             <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
-              <a href="betting.html#market-${m.id}">
-                ${escapeHtml(m.title)}
-              </a>
-            </div>
+  ${escapeHtml(u.title)}
+</div>
             <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:6px;">
               <span>${escapeHtml(m.category || "General")}</span>
               <span> • </span>
