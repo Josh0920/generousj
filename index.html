@@ -160,22 +160,22 @@
       color:var(--muted);
       margin-bottom:8px;
     }
-.sectionhead{
-  display:flex;
-  align-items:baseline;
-  justify-content:space-between;
-  gap:12px;
-  margin-bottom:8px;
-}
+    .sectionhead{
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:8px;
+    }
 
-.viewall{
-  font-family:var(--sans);
-  font-size:12px;
-  color:var(--muted);
-  text-transform:none;
-  letter-spacing:0;
-  white-space:nowrap;
-}
+    .viewall{
+      font-family:var(--sans);
+      font-size:12px;
+      color:var(--muted);
+      text-transform:none;
+      letter-spacing:0;
+      white-space:nowrap;
+    }
     .story{
       padding:10px 0;
       border-bottom:1px solid var(--rule);
@@ -302,26 +302,49 @@
     /* Responsive */
     @media (max-width: 1020px){
       .grid{ grid-template-columns: 1fr 2fr; }
-      .rightRail{ display:none; }
+      /* ✅ IMPORTANT: do NOT hide rightRail on smaller screens */
+      .rightRail{
+        display:block;
+        grid-column: 1 / -1;
+        margin-top: 18px;
+      }
       .brand .name{ font-size:40px; }
     }
-    @media (max-width: 720px){
-  .masthead{
-    grid-template-columns: 1fr;
-    text-align:center;
-  }
-  .masthead .tools{ justify-content:center; flex-wrap:wrap; }
-  .grid{ grid-template-columns: 1fr; }
-  .lead .headline{ font-size:28px; }
-  .subgrid{ grid-template-columns: 1fr; }
-  footer .cols{ grid-template-columns: 1fr 1fr; }
-  .navrow{ justify-content:flex-start; }
 
-  /* 🔽 MOBILE ORDER FIX */
-  .center{ order: 1; }     /* Lead Story */
-  .leftRail{ order: 2; }   /* Top Stories */
-  .rightRail{ order: 3; }
-}
+    @media (max-width: 720px){
+      .masthead{
+        grid-template-columns: 1fr;
+        text-align:center;
+      }
+      .masthead .tools{ justify-content:center; flex-wrap:wrap; }
+      .grid{ grid-template-columns: 1fr; }
+      .lead .headline{ font-size:28px; }
+      .subgrid{ grid-template-columns: 1fr; }
+      footer .cols{ grid-template-columns: 1fr 1fr; }
+
+      /* ✅ Mobile nav: scroll instead of wrapping */
+      .navrow{
+        justify-content:flex-start;
+        flex-wrap:nowrap;
+        overflow-x:auto;
+        -webkit-overflow-scrolling:touch;
+        gap:12px;
+        padding:10px 0 12px;
+      }
+      .navrow a{
+        white-space:nowrap;
+        padding:6px 0;
+      }
+
+      /* ✅ Topbar: allow wrapping so it doesn't crush */
+      .topbar .row{ flex-wrap:wrap; justify-content:center; }
+      .topbar .left, .topbar .right{ flex-wrap:wrap; justify-content:center; }
+
+      /* 🔽 MOBILE ORDER FIX */
+      .center{ order: 1; }     /* Lead Story */
+      .leftRail{ order: 2; }   /* Top Stories */
+      .rightRail{ order: 3; }  /* Live + Betting */
+    }
   </style>
 </head>
 
@@ -337,7 +360,7 @@
         </div>
         <div class="right">
           <a href="#">Sign In</a>
-         <a class="btn primary" href="https://thegenerousjpress.beehiiv.com/subscribe" target="_blank" rel="noopener">Subscribe</a>
+          <a class="btn primary" href="https://thegenerousjpress.beehiiv.com/subscribe" target="_blank" rel="noopener">Subscribe</a>
         </div>
       </div>
     </div>
@@ -360,15 +383,15 @@
         <div class="tools meta">
           <button class="btn" type="button">Today’s Paper</button>
           <a class="btn" href="https://thegenerousjpress.beehiiv.com/subscribe" target="_blank" rel="noopener">
-  Newsletters
-</a>
+            Newsletters
+          </a>
         </div>
       </div>
 
       <nav aria-label="Primary">
         <div class="navrow">
           <a href="admin.html" rel="nofollow">Editor Login</a>
-           <a href="betting.html">Betting</a>
+          <a href="betting.html">Betting</a>
           <a href="#">U.S.</a>
           <a href="#">World</a>
           <a href="#">Politics</a>
@@ -389,15 +412,15 @@
     <div class="wrap">
       <div class="grid">
         <!-- Left column -->
-       <aside class="leftRail">
-  <div class="sectionhead">
-    <div class="sectionlabel">Top Stories</div>
-    <a class="viewall" href="all.html">View all →</a>
-  </div>
+        <aside class="leftRail">
+          <div class="sectionhead">
+            <div class="sectionlabel">Top Stories</div>
+            <a class="viewall" href="all.html">View all →</a>
+          </div>
 
-  <!-- Supabase fills Top Stories here -->
-  <div id="top-stories"></div>
-</aside>
+          <!-- Supabase fills Top Stories here -->
+          <div id="top-stories"></div>
+        </aside>
 
         <!-- Center column -->
         <section class="center">
@@ -407,30 +430,30 @@
           <div id="lead-story"></div>
         </section>
 
-      <!-- Right column -->
-<aside class="rightRail">
+        <!-- Right column -->
+        <aside class="rightRail">
 
-  <div class="module">
-<h3><a href="live.html">Live</a></h3>
-    <div class="muted" id="live-module" style="margin:0;">No live updates yet.</div>
-  </div>
+          <div class="module">
+            <h3><a href="live.html">Live</a></h3>
+            <div class="muted" id="live-module" style="margin:0;">No live updates yet.</div>
+          </div>
 
-  <div style="height:14px"></div>
+          <div style="height:14px"></div>
 
-  <div class="module">
-    <div class="sectionhead" style="margin-bottom:10px;">
-      <h3 style="margin:0; text-transform:none; letter-spacing:0;">Latest Betting</h3>
-      <a class="viewall" href="betting.html">View all →</a>
-    </div>
+          <div class="module">
+            <div class="sectionhead" style="margin-bottom:10px;">
+              <h3 style="margin:0; text-transform:none; letter-spacing:0;">Latest Betting</h3>
+              <a class="viewall" href="betting.html">View all →</a>
+            </div>
 
-    <div id="hp-betting" class="muted" style="margin:0;">Loading latest markets…</div>
-  </div>
+            <div id="hp-betting" class="muted" style="margin:0;">Loading latest markets…</div>
+          </div>
 
-  <div style="height:14px"></div>
+          <div style="height:14px"></div>
 
-  <!-- Newsletter module stays below as-is -->
-  ...
-</aside>
+          <!-- Newsletter module stays below as-is -->
+          ...
+        </aside>
       </div>
     </div>
   </main>
@@ -511,50 +534,51 @@
 
       const formatDate = (d) =>
         new Date(d).toLocaleDateString(undefined, { month:"short", day:"numeric", year:"numeric" });
-data.sort((a, b) => {
-  const ad = new Date(a.published_at || a.updated_at).getTime();
-  const bd = new Date(b.published_at || b.updated_at).getTime();
-  return bd - ad;
-});
-      
+
+      data.sort((a, b) => {
+        const ad = new Date(a.published_at || a.updated_at).getTime();
+        const bd = new Date(b.published_at || b.updated_at).getTime();
+        return bd - ad;
+      });
+
       /* ===== LEAD STORY (newest) ===== */
-const leadStory = data[0];
-const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
+      const leadStory = data[0];
+      const leadDate = formatDate(leadStory.published_at || leadStory.updated_at);
 
-// ✅ NEW: turn storage path into a real URL
-let leadImgHtml = "";
-const leadCardPath = leadStory.cover_image_path || leadStory.image_path;
-const leadCardAlt  = leadStory.cover_image_alt || leadStory.image_alt || "";
+      // ✅ NEW: turn storage path into a real URL
+      let leadImgHtml = "";
+      const leadCardPath = leadStory.cover_image_path || leadStory.image_path;
+      const leadCardAlt  = leadStory.cover_image_alt || leadStory.image_alt || "";
 
-if (leadCardPath) {
-  const { data: img } = sb.storage.from("article-images").getPublicUrl(leadCardPath);
-  const url = img?.publicUrl;
-  if (url) {
-    leadImgHtml = `
-      <div class="media" style="aspect-ratio: 16/9; margin: 6px 0 12px;">
-        <img
-          src="${url}"
-          alt="${escapeHtml(leadCardAlt)}"
-          style="width:100%;height:100%;object-fit:cover"
-          loading="lazy"
-        />
-      </div>
-    `;
-  }
-}
+      if (leadCardPath) {
+        const { data: img } = sb.storage.from("article-images").getPublicUrl(leadCardPath);
+        const url = img?.publicUrl;
+        if (url) {
+          leadImgHtml = `
+            <div class="media" style="aspect-ratio: 16/9; margin: 6px 0 12px;">
+              <img
+                src="${url}"
+                alt="${escapeHtml(leadCardAlt)}"
+                style="width:100%;height:100%;object-fit:cover"
+                loading="lazy"
+              />
+            </div>
+          `;
+        }
+      }
 
-lead.innerHTML = `
-  <article class="lead">
-    ${leadImgHtml}
-    <h1 class="headline">
-      <a href="article.html?slug=${encodeURIComponent(leadStory.slug)}">
-        ${escapeHtml(leadStory.title)}
-      </a>
-    </h1>
-    <div class="byline">${leadDate}</div>
-    <p class="dek">${escapeHtml(leadStory.excerpt || "")}</p>
-  </article>
-`;
+      lead.innerHTML = `
+        <article class="lead">
+          ${leadImgHtml}
+          <h1 class="headline">
+            <a href="article.html?slug=${encodeURIComponent(leadStory.slug)}">
+              ${escapeHtml(leadStory.title)}
+            </a>
+          </h1>
+          <div class="byline">${leadDate}</div>
+          <p class="dek">${escapeHtml(leadStory.excerpt || "")}</p>
+        </article>
+      `;
 
       /* ===== TOP STORIES (older) ===== */
       top.innerHTML = "";
@@ -579,7 +603,8 @@ lead.innerHTML = `
     }
 
     loadHomepageStories();
-async function loadHomepageBetting(){
+
+    async function loadHomepageBetting(){
       const box = document.getElementById("hp-betting");
       if(!box) return;
 
@@ -639,8 +664,8 @@ async function loadHomepageBetting(){
         return `
           <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
             <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
-  ${escapeHtml(u.title)}
-</div>
+              ${escapeHtml(m.title)}
+            </div>
             <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-top:6px;">
               <span>${escapeHtml(m.category || "General")}</span>
               <span> • </span>
@@ -684,10 +709,10 @@ async function loadHomepageBetting(){
         });
 
       const { data, error } = await sb
-  .from("live_updates")
-  .select("title, body, topic, created_at")
-  .order("created_at", { ascending: false })
-  .limit(4);
+        .from("live_updates")
+        .select("title, body, topic, created_at")
+        .order("created_at", { ascending: false })
+        .limit(4);
 
       if(error){
         console.error(error);
