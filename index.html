@@ -683,6 +683,71 @@ async function loadHomepageBetting(){
     }
 
     loadHomepageBetting();
+
+    async function loadLiveModule(){
+      const box = document.getElementById("live-module");
+      if(!box) return;
+
+      const escapeHtml = (s) =>
+        String(s || "")
+          .replaceAll("&","&amp;")
+          .replaceAll("<","&lt;")
+          .replaceAll(">","&gt;")
+          .replaceAll('"',"&quot;")
+          .replaceAll("'","&#039;");
+
+      const formatTime = (d) =>
+        new Date(d).toLocaleString(undefined, {
+          month:"short", day:"numeric", hour:"numeric", minute:"2-digit"
+        });
+
+      const { data, error } = await sb
+        .from("live_updates")
+        .select("title, body, topic, slug, created_at")
+        .eq("status", "published")
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if(error){
+        console.error(error);
+        box.textContent = "Failed to load live updates.";
+        return;
+      }
+
+      if(!data || data.length === 0){
+        box.textContent = "No live updates yet.";
+        return;
+      }
+
+      box.classList.remove("muted");
+      box.style.margin = "0";
+
+      box.innerHTML = data.map(u => {
+        const when = formatTime(u.created_at);
+        const topic = u.topic ? `<span style="font-weight:700;">${escapeHtml(u.topic)}</span> • ` : "";
+        const linkOpen = u.slug ? `<a href="article.html?slug=${encodeURIComponent(u.slug)}">` : "";
+        const linkClose = u.slug ? `</a>` : "";
+
+        return `
+          <div style="padding:10px 0; border-bottom:1px solid var(--rule);">
+            <div style="font-family:var(--sans); font-size:12px; color:var(--muted); margin-bottom:6px;">
+              ${topic}${escapeHtml(when)}
+            </div>
+            <div style="font-family:var(--serif); font-weight:800; font-size:14px; line-height:1.25;">
+              ${linkOpen}${escapeHtml(u.title)}${linkClose}
+            </div>
+            <div style="margin-top:6px; font-size:14px; color:#222;">
+              ${escapeHtml(u.body)}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const kids = box.querySelectorAll("div[style*='border-bottom']");
+      if(kids.length) kids[kids.length - 1].style.borderBottom = "none";
+    }
+
+    loadLiveModule();
   </script>
 </body>
 </html>
