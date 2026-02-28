@@ -494,6 +494,38 @@
         .replaceAll("'","&#039;");
     }
 
+    // Allow ONLY <b>, <strong>, and <br> in live update bodies (prevents XSS but restores bold/line breaks)
+    function sanitizeBody(html){
+      const raw = String(html || "").replace(/\r\n|\r|\n/g, "<br>");
+
+      const t = document.createElement("template");
+      t.innerHTML = raw;
+
+      const ALLOWED = new Set(["B","STRONG","BR"]);
+      const walker = document.createTreeWalker(t.content, NodeFilter.SHOW_ELEMENT, null);
+
+      const toRemove = [];
+      while (walker.nextNode()){
+        const el = walker.currentNode;
+        if (!ALLOWED.has(el.tagName)){
+          toRemove.push(el);
+        } else {
+          // strip attributes even on allowed tags
+          while (el.attributes.length) el.removeAttribute(el.attributes[0].name);
+        }
+      }
+
+      // unwrap disallowed tags (keep their text/children)
+      toRemove.forEach(el => {
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+      });
+
+      return t.innerHTML;
+    }
+
     function fmtTime(iso){
       const d = new Date(iso);
       if (isNaN(d.getTime())) return "—";
@@ -580,7 +612,7 @@
             </div>
           </div>
           <h2 class="uTitle">${escapeHtml(u.title || "")}</h2>
-          <p class="uBody">${escapeHtml(u.body || "")}</p>
+          <p class="uBody">${sanitizeBody(u.body || "")}</p>
         `;
         timelineEl.appendChild(card);
       });
