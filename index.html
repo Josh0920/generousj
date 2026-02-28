@@ -686,11 +686,10 @@ async function loadHomepageBetting(){
         });
 
       const { data, error } = await sb
-        .from("live_updates")
-        .select("title, body, topic, slug, created_at")
-        .eq("status", "published")
-        .order("created_at", { ascending: false })
-        .limit(4);
+  .from("live_updates")
+  .select("title, body, topic, slug, created_at")
+  .order("created_at", { ascending: false })
+  .limit(4);
 
       if(error){
         console.error(error);
