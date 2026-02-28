@@ -231,7 +231,7 @@ function makeEmbedsResponsive(root){
 
     // ✅ FIX: decide “HTML vs text” safely by checking for actual allowed tags
     function isRichHtml(raw){
-      return /<(b|strong|i|em|u|iframe|video)\b/i.test(raw || "");
+      return /<(b|strong|i|em|u|iframe|video|br|p)\b/i.test(raw || "");
     }
 
     function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
