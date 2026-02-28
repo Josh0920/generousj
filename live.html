@@ -293,6 +293,13 @@
       color:#222;
       line-height:1.45;
     }
+    /* Make links in bodies look like links */
+    .uBody a{
+      text-decoration:underline;
+      text-underline-offset:2px;
+      font-family:var(--sans);
+    }
+
     .uActions{
       display:flex;
       gap:8px;
@@ -494,25 +501,44 @@
         .replaceAll("'","&#039;");
     }
 
-    // Allow ONLY <b>, <strong>, and <br> in live update bodies (prevents XSS but restores bold/line breaks)
+    // Allow ONLY <b>, <strong>, <br>, and <a href="..."> in live update bodies
     function sanitizeBody(html){
       const raw = String(html || "").replace(/\r\n|\r|\n/g, "<br>");
 
       const t = document.createElement("template");
       t.innerHTML = raw;
 
-      const ALLOWED = new Set(["B","STRONG","BR"]);
       const walker = document.createTreeWalker(t.content, NodeFilter.SHOW_ELEMENT, null);
-
       const toRemove = [];
+
       while (walker.nextNode()){
         const el = walker.currentNode;
-        if (!ALLOWED.has(el.tagName)){
-          toRemove.push(el);
-        } else {
+
+        if (el.tagName === "A"){
+          // allow only safe href + basic target/rel
+          const href = (el.getAttribute("href") || "").trim();
+          const safe = /^(https?:\/\/|mailto:)/i.test(href);
+          if (!safe){
+            toRemove.push(el); // unwrap unsafe links
+            continue;
+          }
+
+          // keep only href, and force safe target/rel for external links
+          [...el.attributes].forEach(a => el.removeAttribute(a.name));
+          el.setAttribute("href", href);
+          el.setAttribute("target", "_blank");
+          el.setAttribute("rel", "noopener noreferrer");
+          continue;
+        }
+
+        if (el.tagName === "B" || el.tagName === "STRONG" || el.tagName === "BR"){
           // strip attributes even on allowed tags
           while (el.attributes.length) el.removeAttribute(el.attributes[0].name);
+          continue;
         }
+
+        // everything else is disallowed
+        toRemove.push(el);
       }
 
       // unwrap disallowed tags (keep their text/children)
@@ -521,6 +547,48 @@
         if (!parent) return;
         while (el.firstChild) parent.insertBefore(el.firstChild, el);
         parent.removeChild(el);
+      });
+
+      // Auto-link bare URLs in remaining text nodes
+      const URL_RE = /\bhttps?:\/\/[^\s<]+/gi;
+      const tw = document.createTreeWalker(t.content, NodeFilter.SHOW_TEXT, null);
+      const textNodes = [];
+      while (tw.nextNode()) textNodes.push(tw.currentNode);
+
+      textNodes.forEach(node => {
+        // don't auto-link inside existing <a>
+        let p = node.parentNode;
+        while (p){
+          if (p.nodeType === 1 && p.tagName === "A") return;
+          p = p.parentNode;
+        }
+
+        const txt = node.nodeValue || "";
+        if (!URL_RE.test(txt)) return;
+        URL_RE.lastIndex = 0;
+
+        const frag = document.createDocumentFragment();
+        let last = 0;
+        let m;
+
+        while ((m = URL_RE.exec(txt)) !== null){
+          const url = m[0];
+          const start = m.index;
+
+          frag.appendChild(document.createTextNode(txt.slice(last, start)));
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.textContent = url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          frag.appendChild(a);
+
+          last = start + url.length;
+        }
+
+        frag.appendChild(document.createTextNode(txt.slice(last)));
+        node.parentNode.replaceChild(frag, node);
       });
 
       return t.innerHTML;
