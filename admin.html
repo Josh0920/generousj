@@ -182,6 +182,9 @@
     }
     .listTopBar .muted{font-size:12px}
     .listTopBar button{padding:8px 10px}
+
+    /* ✅ NEW: slightly smaller Live editor body */
+    .rte.liveRte{min-height:140px}
   </style>
 </head>
 <body>
@@ -217,11 +220,11 @@
   <!-- DASHBOARD -->
   <div id="dash" class="hidden">
 
-    <!-- ✅ NEW: Dropdown "tabs" row -->
+    <!-- ✅ Dropdown "tabs" row (ALL CLOSED BY DEFAULT) -->
     <div class="topPanels">
 
       <!-- YOUR CONTENT -->
-      <details class="drop" open>
+      <details class="drop">
         <summary>
           <span>Your content</span>
           <span class="hint">Latest 3 + filters</span>
@@ -244,7 +247,6 @@
             </select>
           </div>
 
-          <!-- ✅ NEW: View all toggle -->
           <div class="listTopBar">
             <div class="muted" id="listHint"></div>
             <button id="btnViewAll" type="button">View all</button>
@@ -256,7 +258,7 @@
       </details>
 
       <!-- EDITOR -->
-      <details class="drop" open>
+      <details class="drop">
         <summary>
           <span>Editor (new)</span>
           <span class="hint">Articles</span>
@@ -393,7 +395,16 @@
           <input id="live_title" placeholder="Short headline" />
 
           <label>Body</label>
-          <textarea id="live_body" style="min-height:140px;"></textarea>
+
+          <!-- ✅ NEW: formatting toolbar for Live body -->
+          <div class="rte-toolbar" aria-label="Live formatting toolbar">
+            <button type="button" data-livecmd="bold"><b>B</b></button>
+            <button type="button" data-livecmd="italic"><i>I</i></button>
+            <button type="button" data-livecmd="underline"><u>U</u></button>
+          </div>
+
+          <!-- ✅ NEW: contenteditable live body -->
+          <div id="live_body" class="rte liveRte" contenteditable="true" data-placeholder="Write the live update…"></div>
 
           <label>Status</label>
           <select id="live_status">
@@ -445,7 +456,7 @@
   const articleListEl = document.getElementById("articleList");
   const listStatusEl = document.getElementById("listStatus");
 
-  // ✅ NEW: view all toggle
+  // ✅ view all toggle
   const btnViewAll = document.getElementById("btnViewAll");
   const listHintEl = document.getElementById("listHint");
 
@@ -466,7 +477,7 @@
   const imagePreviewEl = document.getElementById("imagePreview");
   const imageAltEl = document.getElementById("imageAlt");
 
-  // ✅ NEW: Cover (index-only) DOM
+  // ✅ Cover (index-only) DOM
   const coverFileEl = document.getElementById("coverFile");
   const btnUploadCover = document.getElementById("btnUploadCover");
   const btnRemoveCover = document.getElementById("btnRemoveCover");
@@ -491,7 +502,7 @@
   // ✅ Live DOM (separate)
   const liveTopicEl = document.getElementById("live_topic");
   const liveTitleEl = document.getElementById("live_title");
-  const liveBodyEl = document.getElementById("live_body");
+  const liveBodyEl = document.getElementById("live_body"); // now a contenteditable DIV
   const liveStatusEl = document.getElementById("live_status");
   const livePublishBtn = document.getElementById("live_publish");
   const liveDeleteBtn = document.getElementById("live_delete");
@@ -505,8 +516,12 @@
   const setEditStatus  = (m="") => (editStatusEl.textContent = m);
   const setLiveStatus  = (m="") => (liveStatusTextEl.textContent = m);
 
-  // ✅ NEW: list state
+  // ✅ List state
   let listShowAll = false;
+
+  // ✅ Live "title" column auto-detect (fixes: column live_updates.title does not exist)
+  let LIVE_TITLE_COL = "title";
+  const LIVE_TITLE_CANDIDATES = ["title","headline","heading","name","live_title"];
 
   // --- Helpers ---
   function slugify(str){
@@ -553,7 +568,7 @@
   const IMAGE_BUCKET = "article-images";
   let currentImagePath = null;
 
-  // ✅ NEW: index-only cover image state (stored in articles.cover_image_path)
+  // ✅ index-only cover image state (stored in articles.cover_image_path)
   let currentCoverPath = null;
 
   const VIDEO_BUCKET = "article-videos";
@@ -574,7 +589,6 @@
       : `Uploaded ✅\n${path}`;
   }
 
-  // ✅ NEW: Cover preview helper
   function setCoverPreview(path){
     if (!path){
       coverPreviewEl.textContent = "No cover uploaded.";
@@ -664,7 +678,7 @@
     setEditStatus("Image removed (click Save to store this change).");
   });
 
-  // ✅ NEW: Upload/remove cover (index-only)
+  // Upload/remove cover (index-only)
   btnUploadCover.addEventListener("click", async () => {
     setEditStatus("");
 
@@ -766,7 +780,7 @@
       currentVideoPath = path;
       setVideoPreview(currentVideoPath);
 
-      // ✅ IMPORTANT: when a video is uploaded, clear ARTICLE image so article.html won't show a photo
+      // IMPORTANT: when a video is uploaded, clear ARTICLE image so article.html won't show a photo
       currentImagePath = null;
       imageFileEl.value = "";
       setImagePreview(null);
@@ -804,7 +818,7 @@
   let marketsCache = [];
   let selectedMarketId = null;
 
-  // ✅ NEW: Live state (separate)
+  // Live state
   let liveCache = [];
   let selectedLiveId = null;
 
@@ -845,7 +859,6 @@
     imageFileEl.value = "";
     setImagePreview(null);
 
-    // ✅ NEW: reset cover fields
     currentCoverPath = null;
     coverAltEl.value = "";
     coverFileEl.value = "";
@@ -874,7 +887,6 @@
     imageAltEl.value = a.image_alt || "";
     setImagePreview(currentImagePath);
 
-    // ✅ NEW: load cover fields
     currentCoverPath = a.cover_image_path || null;
     coverAltEl.value = a.cover_image_alt || "";
     setCoverPreview(currentCoverPath);
@@ -931,7 +943,6 @@
 
     combined.sort((x, y) => new Date(y.sortDate) - new Date(x.sortDate));
 
-    // ✅ NEW: show only latest 3 by default (when no filters/search)
     const isDefaultView = (!q && st === "all" && ty === "all");
     const shouldLimit = isDefaultView && !listShowAll;
     const toShow = shouldLimit ? combined.slice(0, 3) : combined;
@@ -1046,12 +1057,12 @@
     renderList();
   }
 
-  // ✅ NEW: Live (separate from articles/markets list)
+  // ✅ Live helpers
   function clearLiveForm(){
     selectedLiveId = null;
     if (liveTopicEl) liveTopicEl.value = "";
     if (liveTitleEl) liveTitleEl.value = "";
-    if (liveBodyEl) liveBodyEl.value = "";
+    if (liveBodyEl) liveBodyEl.innerHTML = "";
     if (liveStatusEl) liveStatusEl.value = "draft";
     if (livePublishBtn) livePublishBtn.textContent = "Publish Update";
     setLiveStatus("");
@@ -1082,7 +1093,7 @@
         selectedLiveId = u.id;
         if (liveTopicEl) liveTopicEl.value = u.topic || "";
         if (liveTitleEl) liveTitleEl.value = u.title || "";
-        if (liveBodyEl) liveBodyEl.value = u.body || "";
+        if (liveBodyEl) liveBodyEl.innerHTML = (u.body || "");
         if (liveStatusEl) liveStatusEl.value = u.status || "draft";
         if (livePublishBtn) livePublishBtn.textContent = "Update";
         setLiveStatus("Loaded ✅");
@@ -1093,11 +1104,23 @@
   }
 
   async function loadLiveUpdates(){
-    const { data, error } = await supabase
-      .from("live_updates")
-      .select("id,title,body,topic,status,created_at")
-      .order("created_at", { ascending: false })
-      .limit(25);
+    const tryLoad = async (col) => {
+      return await supabase
+        .from("live_updates")
+        .select(`id,title:${col},body,topic,status,created_at`)
+        .order("created_at", { ascending: false })
+        .limit(25);
+    };
+
+    let { data, error } = await tryLoad(LIVE_TITLE_COL);
+
+    if (error && /column live_updates\.[a-zA-Z0-9_]+ does not exist/i.test(error.message || "")) {
+      for (const col of LIVE_TITLE_CANDIDATES) {
+        LIVE_TITLE_COL = col;
+        ({ data, error } = await tryLoad(col));
+        if (!error) break;
+      }
+    }
 
     if(error){
       setLiveStatus("Load error: " + error.message);
@@ -1119,15 +1142,17 @@
       return;
     }
 
+    const rawBody = normalizeArticleHtml((liveBodyEl?.innerHTML || "")).trim();
+
     const payload = {
       topic: (liveTopicEl?.value || "").trim(),
-      title: (liveTitleEl?.value || "").trim(),
-      body:  (liveBodyEl?.value || "").trim(),
+      [LIVE_TITLE_COL]: (liveTitleEl?.value || "").trim(),
+      body: rawBody,
       status: (liveStatusEl?.value || "draft").trim()
     };
 
-    if(!payload.title) return setLiveStatus("Title is required.");
-    if(!payload.body)  return setLiveStatus("Body is required.");
+    if(!payload[LIVE_TITLE_COL]) return setLiveStatus("Title is required.");
+    if(!payload.body) return setLiveStatus("Body is required.");
 
     livePublishBtn.disabled = true;
     setLiveStatus(selectedLiveId ? "Updating…" : "Publishing…");
@@ -1198,7 +1223,7 @@
   liveDeleteBtn?.addEventListener("click", deleteLiveUpdate);
   liveClearBtn?.addEventListener("click", clearLiveForm);
 
-  // --- Events ---
+  // --- Rich text events (Articles) ---
   document.querySelectorAll(".rte-toolbar [data-cmd]").forEach(btn => {
     btn.addEventListener("click", () => {
       const cmd = btn.getAttribute("data-cmd");
@@ -1229,6 +1254,38 @@
     document.execCommand("insertText", false, text);
   });
 
+  // --- Rich text events (Live) ---
+  document.querySelectorAll(".rte-toolbar [data-livecmd]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const cmd = btn.getAttribute("data-livecmd");
+      document.execCommand(cmd, false, null);
+      liveBodyEl.focus();
+    });
+  });
+
+  liveBodyEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      document.execCommand("insertLineBreak");
+    }
+  });
+
+  liveBodyEl?.addEventListener("paste", (e) => {
+    e.preventDefault();
+
+    const cd = (e.clipboardData || window.clipboardData);
+    const html = cd ? (cd.getData("text/html") || "") : "";
+    const text = cd ? (cd.getData("text/plain") || "") : "";
+
+    if (html && (/<iframe[\s>]/i.test(html) || /<video[\s>]/i.test(html) || /<source[\s>]/i.test(html))) {
+      document.execCommand("insertHTML", false, html);
+      return;
+    }
+
+    document.execCommand("insertText", false, text);
+  });
+
+  // --- Title -> slug ---
   titleEl.addEventListener("input", () => {
     if (!selectedArticleId && !slugEl.value.trim()) {
       slugEl.value = slugify(titleEl.value);
@@ -1240,28 +1297,26 @@
     titleEl.focus();
   });
 
-  // ✅ NEW: View all toggle
+  // View all toggle
   btnViewAll?.addEventListener("click", () => {
     listShowAll = !listShowAll;
     renderList();
   });
 
   searchEl.addEventListener("input", () => {
-    // if searching, show full results automatically
     if ((searchEl.value || "").trim()) listShowAll = true;
     renderList();
   });
   filterStatusEl.addEventListener("change", () => {
-    // if filtering, show full results automatically
     if (filterStatusEl.value !== "all") listShowAll = true;
     renderList();
   });
   filterTypeEl.addEventListener("change", () => {
-    // if filtering, show full results automatically
     if (filterTypeEl.value !== "all") listShowAll = true;
     renderList();
   });
 
+  // --- Auth ---
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     setLoginStatus("");
@@ -1289,6 +1344,7 @@
     currentUser = data.user;
     showAuthedUI(currentUser?.email);
     clearEditor();
+    clearLiveForm();
     await loadArticles();
     await loadMarkets();
     await loadLiveUpdates();
@@ -1300,6 +1356,7 @@
     showLoggedOutUI();
   });
 
+  // --- Save/Delete Articles ---
   btnSave.addEventListener("click", async () => {
     setEditStatus("");
 
@@ -1312,7 +1369,6 @@
     const image_path = currentImagePath;
     const image_alt = (imageAltEl.value || "").trim();
 
-    // ✅ NEW: index-only cover fields
     const cover_image_path = currentCoverPath;
     const cover_image_alt = (coverAltEl.value || "").trim();
 
@@ -1511,6 +1567,7 @@
     currentUser = sess.session.user;
     showAuthedUI(currentUser.email);
     clearEditor();
+    clearLiveForm();
     await loadArticles();
     await loadMarkets();
     await loadLiveUpdates();
