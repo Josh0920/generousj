@@ -70,8 +70,8 @@
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const supabase = createClient(
-      "SUPABASE_URL",
-      "SUPABASE_ANON_KEY"
+      "https://gyfoaukqsgbtcyxnmgvs.supabase.co",
+      "sb_publishable__zVZ8qNWFakc7aA-K7SZjQ_o-biHbVB"
     );
 
     const $ = (id) => document.getElementById(id);
@@ -111,14 +111,14 @@
         return;
       }
 
-      // 🔐 Enforce LIVE role only
+      // 🔐 Only allow LIVE role
       if (profile.role !== "live") {
         await supabase.auth.signOut();
         $("msg").textContent = "This login is for Live editors only.";
         return;
       }
 
-      // ✅ Success
+      // ✅ Success — go to live editor panel
       window.location.href = "/live-admin.html";
     });
   </script>
